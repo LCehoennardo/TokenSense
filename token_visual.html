@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TOKENS ⚡ Usage Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <span class="logo-text">TOKENS</span>
+    </div>
+    <div class="header-meta">
+      <div class="live-indicator" id="liveIndicator">
+        <div class="live-dot"></div>
+        <span class="live-text">LIVE</span>
+      </div>
+      <div>
+        <span id="refreshLabel">Refresh in</span> <span class="countdown" id="countdown">60</span>s
+      </div>
+      <div id="lastUpdated">--:--:--</div>
+      <div class="header-actions">
+        <button class="lang-toggle" id="langToggle" aria-label="Toggle language" title="Toggle language"></button>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main" id="mainContent">
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      <span id="loadingText">Loading token data...</span>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

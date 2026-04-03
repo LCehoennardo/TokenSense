@@ -1,0 +1,7 @@
+# Auto-generated — do not commit
+token_data.js
+.session_cache.json
+.summary_cache.json
+
+# Local Claude settings
+.claude/
