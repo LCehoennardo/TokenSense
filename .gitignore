@@ -5,3 +5,6 @@ token_data.js
 
 # Local Claude settings
 .claude/
+
+# Claude guidance (personal)
+CLAUDE.md
