@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Token Dashboard is a visualization tool for Claude Code token usage. It parses Claude's session logs from `~/.claude/projects/` and generates an interactive HTML dashboard showing token consumption patterns.
+TokenSense is a visualization tool for Claude Code token usage. It parses Claude's session logs from `~/.claude/projects/` and generates an interactive HTML dashboard showing token consumption patterns.
 
 ## Key Commands
 

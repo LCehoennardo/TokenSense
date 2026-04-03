@@ -1,4 +1,4 @@
-# Token Dashboard
+# TokenSense
 
 A visualization tool for Claude Code token usage. Parse session logs and generate an interactive HTML dashboard showing token consumption patterns.
 
