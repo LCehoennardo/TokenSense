@@ -2,6 +2,8 @@
 
 A visualization tool for Claude Code token usage. Parse session logs and generate an interactive HTML dashboard showing token consumption patterns.
 
+[中文版 README](./README.zh.md)
+
 ## Features
 
 - **Token Overview** - Total tokens with breakdown (input/output/cache creation/cache read)
