@@ -26,6 +26,9 @@ Claude Code Token 使用可视化工具。解析会话日志并生成交互式 H
 git clone https://github.com/yourusername/token-dashboard.git
 cd token-dashboard
 
+# 进入源代码目录
+cd src
+
 # 生成数据（一次性）
 python3 refresh_token_data.py --once
 
@@ -43,6 +46,7 @@ open token_visual.html
 生成数据后退出：
 
 ```bash
+cd src
 python3 refresh_token_data.py --once
 ```
 
@@ -51,6 +55,7 @@ python3 refresh_token_data.py --once
 后台自动刷新：
 
 ```bash
+cd src
 python3 refresh_token_data.py
 ```
 
@@ -60,13 +65,19 @@ python3 refresh_token_data.py
 
 ```
 token-dashboard/
-├── refresh_token_data.py  # 主 Python 脚本
-├── token_visual.html      # 仪表板 HTML
-├── style.css              # 仪表板样式
-├── app.js                 # 仪表板 JavaScript
-├── token_data.js          # 自动生成的数据（gitignore）
-├── .session_cache.json    # 解析缓存（gitignore）
-└── .summary_cache.json    # 汇总缓存（gitignore）
+├── docs/                     # 文档
+│   ├── README.md            # 英文版说明
+│   ├── README.zh.md        # 中文版说明
+│   └── LICENSE
+├── src/                     # 源代码
+│   ├── refresh_token_data.py  # 主 Python 脚本
+│   ├── token_visual.html      # 仪表板 HTML
+│   ├── style.css              # 仪表板样式
+│   └── app.js                 # 仪表板 JavaScript
+└── data/                     # 自动生成的数据（gitignore）
+    ├── token_data.js
+    ├── .session_cache.json
+    └── .summary_cache.json
 ```
 
 ## License

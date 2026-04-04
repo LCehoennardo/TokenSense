@@ -401,7 +401,7 @@
       return dict[key] || i18n.en[key] || key;
     }
 
-    const DATA_FILE = 'token_data.js';
+    const DATA_FILE = '../data/token_data.js';
     const REFRESH_INTERVAL = 60;
     const SESSIONS_PER_PAGE = 15;
     const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

@@ -28,6 +28,9 @@ A visualization tool for Claude Code token usage. Parse session logs and generat
 git clone https://github.com/yourusername/token-dashboard.git
 cd token-dashboard
 
+# Enter source directory
+cd src
+
 # Generate data once
 python3 refresh_token_data.py --once
 
@@ -45,6 +48,7 @@ open token_visual.html
 Generate data once and exit:
 
 ```bash
+cd src
 python3 refresh_token_data.py --once
 ```
 
@@ -53,6 +57,7 @@ python3 refresh_token_data.py --once
 Run in the background with auto-refresh:
 
 ```bash
+cd src
 python3 refresh_token_data.py
 ```
 
@@ -62,13 +67,19 @@ The dashboard will automatically reload data every 60 seconds.
 
 ```
 token-dashboard/
-├── refresh_token_data.py  # Main Python script
-├── token_visual.html      # Dashboard HTML
-├── style.css              # Dashboard styles
-├── app.js                 # Dashboard JavaScript
-├── token_data.js          # Auto-generated data (gitignored)
-├── .session_cache.json    # Parse cache (gitignored)
-└── .summary_cache.json    # Summary cache (gitignored)
+├── docs/                     # Documentation
+│   ├── README.md            # English README
+│   ├── README.zh.md        # Chinese README
+│   └── LICENSE
+├── src/                     # Source code
+│   ├── refresh_token_data.py  # Main Python script
+│   ├── token_visual.html      # Dashboard HTML
+│   ├── style.css              # Dashboard styles
+│   └── app.js                 # Dashboard JavaScript
+└── data/                     # Auto-generated data (gitignored)
+    ├── token_data.js
+    ├── .session_cache.json
+    └── .summary_cache.json
 ```
 
 ## License

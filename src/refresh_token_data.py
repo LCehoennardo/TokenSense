@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 from collections import defaultdict, Counter
 
 PROJECTS_DIR = Path.home() / ".claude" / "projects"
-OUTPUT_JS = Path(__file__).parent / "token_data.js"
-CACHE_FILE = Path(__file__).parent / ".session_cache.json"
-SUMMARY_CACHE_FILE = Path(__file__).parent / ".summary_cache.json"
+OUTPUT_JS = Path(__file__).parent.parent / "data" / "token_data.js"
+CACHE_FILE = Path(__file__).parent.parent / "data" / ".session_cache.json"
+SUMMARY_CACHE_FILE = Path(__file__).parent.parent / "data" / ".summary_cache.json"
 CACHE_VERSION = "v4"  # 递增此值以使旧缓存失效
 
 # ── 模型定价（$/M tokens，唯一权威来源） ──────────────────────────
