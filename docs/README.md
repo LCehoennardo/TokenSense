@@ -1,8 +1,16 @@
-# TokenSense
+# TokenSense ⚡
+
+<img src="./images/logo.svg" alt="TokenSense" width="240"/>
+
+> 了解你的 Claude Code 消费，做聪明的 AI 用户
+
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![Python Version](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![ Claude Code](https://img.shields.io/badge/Claude%20Code-Supported-purple.svg)](https://claude.com/code)
 
 A visualization tool for Claude Code token usage. Parse session logs and generate an interactive HTML dashboard showing token consumption patterns.
 
-[中文版 README](./README.zh.md)
+[中文](./README.zh.md)
 
 ## Features
 
@@ -23,10 +31,12 @@ A visualization tool for Claude Code token usage. Parse session logs and generat
 
 ## Quick Start
 
+![Dashboard Screenshot](./images/screenshot-demo-en.png)
+
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/token-dashboard.git
-cd token-dashboard
+git clone https://github.com/LCehoennardo/TokenSense.git
+cd TokenSense
 
 # Enter source directory
 cd src

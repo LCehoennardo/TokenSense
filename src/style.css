@@ -165,13 +165,13 @@
     }
 
     .logo {
-      font-family: 'Outfit', sans-serif;
-      font-weight: 900;
-      font-size: 24px;
-      letter-spacing: -1px;
       display: flex;
       align-items: center;
-      gap: 8px;
+    }
+
+    .logo-img {
+      height: 32px;
+      width: auto;
     }
 
     .logo-icon {

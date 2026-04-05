@@ -4,9 +4,6 @@ data/
 # Local Claude settings
 .claude/
 
-# Claude guidance (personal)
-CLAUDE.md
-
 # Python
 __pycache__/
 *.py[cod]
@@ -56,3 +53,8 @@ ENV/
 *.swo
 *~
 .gstack/
+
+
+# Personal
+CLAUDE.md
+docs/prompt.md
