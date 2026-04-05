@@ -1683,7 +1683,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `token-dashboard-${formatDateLocal(new Date())}.csv`;
+      a.download = `TokenSense-${formatDateLocal(new Date())}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     }

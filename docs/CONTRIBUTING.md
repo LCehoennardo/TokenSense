@@ -5,7 +5,7 @@
 ## 快速开始
 
 1. Fork 这个仓库
-2. 克隆你的 Fork：`git clone https://github.com/YOUR_USERNAME/token-dashboard.git`
+2. 克隆你的 Fork：`git clone https://github.com/YOUR_USERNAME/TokenSense.git`
 3. 创建功能分支：`git checkout -b feature/your-feature`
 
 ## 开发环境
