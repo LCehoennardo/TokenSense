@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b6b"/>
+      <stop offset="100%" stop-color="#ffd93d"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Gauge/dashboard arc -->
+  <path d="M6 22 A 8 8 0 0 1 18 22" fill="none" stroke="#1e2730" stroke-width="2" stroke-linecap="round"/>
+  <path d="M6 22 A 8 8 0 0 1 16 14" fill="none" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Center dot -->
+  <circle cx="12" cy="22" r="1.5" fill="#ff6b6b"/>
+
+  <!-- Lightning bolt -->
+  <path d="M24 4L20 12h3l-2 8 8-10h-4l2-6z" fill="url(#grad1)"/>
+</svg>
