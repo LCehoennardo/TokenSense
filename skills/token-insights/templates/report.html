@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Token-Insights Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0f1419;
+      --bg-card: #1a1f2e;
+      --text-primary: #f0f4f8;
+      --text-secondary: #8899a6;
+      --accent-cool: #4ecdc4;
+      --accent-hot: #ff6b6b;
+      --border: #2a3441;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      padding: 24px;
+      line-height: 1.6;
+    }
+
+    .header {
+      max-width: 1400px;
+      margin: 0 auto 32px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .generated-at {
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto 32px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .section {
+      max-width: 1400px;
+      margin: 0 auto 32px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    .chart-container {
+      height: 300px;
+      position: relative;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      color: var(--text-secondary);
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .num {
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Token-Insights ⚡ Report</h1>
+    <p class="generated-at">Generated: {{GENERATED_AT}}</p>
+  </header>
+
+  <main>
+    <!-- Metrics Overview -->
+    <div class="metrics-grid" id="metricsGrid"></div>
+
+    <!-- Daily Usage Chart -->
+    <div class="section">
+      <h2 class="section-title">Daily Usage</h2>
+      <div class="chart-container">
+        <canvas id="dailyChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Top Projects -->
+    <div class="section">
+      <h2 class="section-title">Top Projects</h2>
+      <table id="projectsTable"></table>
+    </div>
+
+    <!-- Top Models -->
+    <div class="section">
+      <h2 class="section-title">Top Models</h2>
+      <table id="modelsTable"></table>
+    </div>
+
+    <!-- Sessions Table -->
+    <div class="section">
+      <h2 class="section-title">Recent Sessions</h2>
+      <table id="sessionsTable"></table>
+    </div>
+  </main>
+
+  <script>
+    // Embedded report data
+    const REPORT_DATA = {{REPORT_DATA}};
+
+    // Format large numbers
+    function formatNumber(n) {
+      if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return n.toLocaleString();
+    }
+
+    // Format cost
+    function formatCost(cost) {
+      return '$' + cost.toFixed(2);
+    }
+
+    // Render metrics cards
+    function renderMetrics(summary) {
+      const grid = document.getElementById('metricsGrid');
+      const metrics = [
+        { label: 'Total Tokens', value: formatNumber(summary.total_tokens) },
+        { label: 'Input Tokens', value: formatNumber(summary.total_input) },
+        { label: 'Output Tokens', value: formatNumber(summary.total_output) },
+        { label: 'Cache Creation', value: formatNumber(summary.total_cache_creation) },
+        { label: 'Cache Hits', value: formatNumber(summary.total_cache_read) },
+        { label: 'Est. Cost', value: formatCost(summary.total_cost) },
+        { label: 'Sessions', value: summary.total_sessions.toString() },
+      ];
+
+      grid.innerHTML = metrics.map(m => `
+        <div class="metric-card">
+          <div class="metric-label">${m.label}</div>
+          <div class="metric-value">${m.value}</div>
+        </div>
+      `).join('');
+    }
+
+    // Render daily chart
+    function renderChart(daily) {
+      const ctx = document.getElementById('dailyChart');
+
+      if (!daily || daily.length === 0) {
+        document.querySelector('#dailyChart').parentElement.innerHTML =
+          '<div class="empty-state">No usage data available</div>';
+        return;
+      }
+
+      const data = daily.slice(-14); // Last 14 days
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => d.date.slice(5)), // MM-DD format
+          datasets: [
+            {
+              label: 'Input',
+              data: data.map(d => d.input_tokens),
+              backgroundColor: '#4ecdc4',
+              borderRadius: 4
+            },
+            {
+              label: 'Output',
+              data: data.map(d => d.output_tokens),
+              backgroundColor: '#c8ff00',
+              borderRadius: 4
+            },
+            {
+              label: 'Cache Creation',
+              data: data.map(d => d.cache_creation),
+              backgroundColor: '#ff6b6b',
+              borderRadius: 4
+            },
+            {
+              label: 'Cache Read',
+              data: data.map(d => d.cache_read),
+              backgroundColor: '#ffd93d',
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { color: '#8899a6', font: { size: 10 } }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#8899a6', font: { size: 9 } }
+            },
+            y: {
+              grid: { color: '#2a3441' },
+              ticks: {
+                color: '#8899a6',
+                font: { size: 9 },
+                callback: (value) => formatNumber(value)
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Render projects table
+    function renderProjects(projects) {
+      const table = document.getElementById('projectsTable');
+
+      if (!projects || projects.length === 0) {
+        table.innerHTML = '<div class="empty-state">No project data available</div>';
+        return;
+      }
+
+      const top = projects.slice(0, 10);
+
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th class="num">Input</th>
+            <th class="num">Output</th>
+            <th class="num">Cache Create</th>
+            <th class="num">Cache Read</th>
+            <th class="num">Total</th>
+            <th class="num">Sessions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${top.map(p => `
+            <tr>
+              <td>${p.project}</td>
+              <td class="num">${formatNumber(p.input_tokens)}</td>
+              <td class="num">${formatNumber(p.output_tokens)}</td>
+              <td class="num">${formatNumber(p.cache_creation)}</td>
+              <td class="num">${formatNumber(p.cache_read)}</td>
+              <td class="num">${formatNumber(p.total_tokens)}</td>
+              <td class="num">${p.sessions}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+    }
+
+    // Render models table
+    function renderModels(models) {
+      const table = document.getElementById('modelsTable');
+
+      if (!models || models.length === 0) {
+        table.innerHTML = '<div class="empty-state">No model data available</div>';
+        return;
+      }
+
+      const top = models.slice(0, 10);
+
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th class="num">Input</th>
+            <th class="num">Output</th>
+            <th class="num">Cache Create</th>
+            <th class="num">Cache Read</th>
+            <th class="num">Total</th>
+            <th class="num">Sessions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${top.map(m => `
+            <tr>
+              <td>${m.model}</td>
+              <td class="num">${formatNumber(m.input_tokens)}</td>
+              <td class="num">${formatNumber(m.output_tokens)}</td>
+              <td class="num">${formatNumber(m.cache_creation)}</td>
+              <td class="num">${formatNumber(m.cache_read)}</td>
+              <td class="num">${formatNumber(m.total_tokens)}</td>
+              <td class="num">${m.sessions}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+    }
+
+    // Render sessions table
+    function renderSessions(sessions) {
+      const table = document.getElementById('sessionsTable');
+
+      if (!sessions || sessions.length === 0) {
+        table.innerHTML = '<div class="empty-state">No session data available</div>';
+        return;
+      }
+
+      const recent = sessions.slice(0, 20);
+
+      table.innerHTML = `
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Project</th>
+            <th>Models</th>
+            <th class="num">Input</th>
+            <th class="num">Output</th>
+            <th class="num">Cache Create</th>
+            <th class="num">Cache Read</th>
+            <th class="num">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${recent.map(s => `
+            <tr>
+              <td>${s.date} ${s.time}</td>
+              <td>${s.project}</td>
+              <td>${s.models && s.models.length > 0 ? s.models.join(', ') : 'Unknown'}</td>
+              <td class="num">${formatNumber(s.input_tokens)}</td>
+              <td class="num">${formatNumber(s.output_tokens)}</td>
+              <td class="num">${formatNumber(s.cache_creation_input_tokens)}</td>
+              <td class="num">${formatNumber(s.cache_read_input_tokens)}</td>
+              <td class="num">${formatNumber(s.total_tokens)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      `;
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', () => {
+      const { summary } = REPORT_DATA;
+      renderMetrics(summary);
+      renderChart(summary.daily || []);
+      renderProjects(summary.by_project || []);
+      renderModels(summary.by_model || []);
+      renderSessions(REPORT_DATA.sessions || []);
+    });
+  </script>
+</body>
+</html>
