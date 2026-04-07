@@ -29,7 +29,6 @@
         min_per_turn: 'min/turn',
         extended_thinking: 'Extended Thinking',
         of_sessions: 'of sessions',
-        intraday_timeline: 'Intraday Timeline',
         daily_usage: 'Daily Usage',
         daily_btn: 'Daily',
         hourly_btn: 'Hourly',
@@ -227,7 +226,6 @@
         min_per_turn: '分钟/轮',
         extended_thinking: '扩展思考',
         of_sessions: '的会话占比',
-        intraday_timeline: '日内时间线',
         daily_usage: '每日用量',
         daily_btn: '按日',
         hourly_btn: '按时',
@@ -435,9 +433,7 @@
       currentPage: 1,
       countdown: REFRESH_INTERVAL,
       heatmapView: 'month',
-      selectedDate: '',
       theme: localStorage.getItem('theme') || 'dark',
-      lang: localStorage.getItem('lang') || 'en',
       activeTab: 'tokens',  // 'tokens' | 'costs' | 'behavior' | 'tools'
       showExtraCols: false,   // toggle extra session table columns
       projectCostView: 'est', // 'est' | 'real'
@@ -459,9 +455,6 @@
       // Update chart colors if chart exists
       if (state.charts.daily) {
         updateChartTheme();
-      }
-      if (state.charts.intraday) {
-        updateIntradayChartTheme();
       }
     }
 
@@ -491,29 +484,6 @@
       state.charts.daily.options.plugins.tooltip.borderColor = tooltipBorder;
 
       state.charts.daily.update('none');
-    }
-
-    function updateIntradayChartTheme() {
-      const isLight = state.theme === 'light';
-      const gridColor = isLight ? '#e5e3e0' : '#1e2730';
-      const textColor = isLight ? '#8a8a8a' : '#4a5568';
-      const legendColor = isLight ? '#5a5a5a' : '#8899a6';
-      const tooltipBg = isLight ? '#ffffff' : '#151b23';
-      const tooltipTitle = isLight ? '#1a1a1a' : '#f0f4f8';
-      const tooltipBody = isLight ? '#5a5a5a' : '#8899a6';
-      const tooltipBorder = isLight ? '#e5e3e0' : '#1e2730';
-
-      state.charts.intraday.options.scales.x.grid.color = 'transparent';
-      state.charts.intraday.options.scales.x.ticks.color = textColor;
-      state.charts.intraday.options.scales.y.grid.color = gridColor;
-      state.charts.intraday.options.scales.y.ticks.color = textColor;
-      state.charts.intraday.options.plugins.legend.labels.color = legendColor;
-      state.charts.intraday.options.plugins.tooltip.backgroundColor = tooltipBg;
-      state.charts.intraday.options.plugins.tooltip.titleColor = tooltipTitle;
-      state.charts.intraday.options.plugins.tooltip.bodyColor = tooltipBody;
-      state.charts.intraday.options.plugins.tooltip.borderColor = tooltipBorder;
-
-      state.charts.intraday.update('none');
     }
 
     function initTheme() {
@@ -722,9 +692,9 @@
           ${tabNav}
           <div class="content-left">
             ${renderBehaviorHero(summary)}
-            ${renderHourWeekdayHeatmap(summary.hour_weekday_matrix || [], summary.hourly || [])}
-            ${renderAutonomyTrend(summary.autonomy_trend || [])}
-            ${renderThinkingAnalysis(summary.thinking_stats || {}, summary.daily || [])}
+            ${renderHourWeekdayHeatmap(summary.hour_weekday_matrix || [])}
+            ${renderAutonomyTrend()}
+            ${renderThinkingAnalysis(summary.thinking_stats || {})}
             ${renderStreakCalendar(summary.daily || [], summary.streak || {})}
           </div>
           <div class="sidebar">
@@ -763,7 +733,6 @@
 
     function getYesterdaySameTimeData(sessions) {
       const now = new Date();
-      const today = formatDateLocal(now);
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
 
@@ -856,29 +825,6 @@
               <div class="metric-value">${s.thinking_stats ? s.thinking_stats.sessions_with_thinking : '—'}</div>
               <div class="metric-sub">${s.thinking_stats ? s.thinking_stats.pct_sessions.toFixed(0) + '% ' + t('of_sessions') : ''}</div>
             </div>
-          </div>
-        </div>
-      `;
-    }
-
-    function renderIntradayChart(sessions) {
-      const dates = [...new Set(sessions.map(s => s.date).filter(d => d))].sort().reverse();
-      const recentDates = dates.slice(0, 7);
-
-      const dateButtons = recentDates.map(d =>
-        `<button class="date-btn ${d === state.selectedDate ? 'active' : ''}" data-date="${d}">${d.slice(5)}</button>`
-      ).join('');
-
-      return `
-        <div class="section">
-          <div class="section-header">
-            <div class="section-title">${t('intraday_timeline')}</div>
-            <div class="heatmap-controls">
-              ${dateButtons}
-            </div>
-          </div>
-          <div class="chart-container">
-            <canvas id="intradayChart"></canvas>
           </div>
         </div>
       `;
@@ -1006,119 +952,6 @@
               fill: isHourly,
               borderRadius: isHourly ? 0 : 4,
               barPercentage: 0.7
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: 'top',
-              align: 'end',
-              labels: {
-                color: legendColor,
-                font: { family: 'JetBrains Mono', size: 10 },
-                boxWidth: 12,
-                boxHeight: 12,
-                borderRadius: 3,
-                useBorderRadius: true
-              }
-            },
-            tooltip: {
-              backgroundColor: tooltipBg,
-              titleColor: tooltipTitle,
-              bodyColor: tooltipBody,
-              borderColor: tooltipBorder,
-              borderWidth: 1,
-              cornerRadius: 8,
-              padding: 12
-            }
-          },
-          scales: {
-            x: {
-              grid: { display: false },
-              ticks: {
-                color: textColor,
-                font: { family: 'JetBrains Mono', size: 9 },
-                maxTicksLimit: isHourly ? 48 : 12,
-                maxRotation: isHourly ? 45 : 0
-              }
-            },
-            y: {
-              grid: { color: gridColor },
-              ticks: {
-                color: textColor,
-                font: { family: 'JetBrains Mono', size: 9 },
-                callback: formatNumber
-              }
-            }
-          }
-        }
-      });
-    }
-
-    function initIntradayChart(sessions) {
-      const ctx = document.getElementById('intradayChart');
-      if (!ctx) return;
-
-      const daySessions = sessions.filter(s => s.date === state.selectedDate).sort((a, b) =>
-        a.start_time.localeCompare(b.start_time)
-      );
-
-      if (daySessions.length === 0) {
-        if (state.charts.intraday) state.charts.intraday.destroy();
-        ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
-        return;
-      }
-
-      const labels = daySessions.map(s => s.time);
-      const inputData = daySessions.map(s => s.input_tokens);
-      const outputData = daySessions.map(s => s.output_tokens);
-      const totalData = daySessions.map(s => s.total_tokens);
-
-      if (state.charts.intraday) state.charts.intraday.destroy();
-
-      const isLight = state.theme === 'light';
-      const gridColor = isLight ? '#e5e3e0' : '#1e2730';
-      const textColor = isLight ? '#8a8a8a' : '#4a5568';
-      const legendColor = isLight ? '#5a5a5a' : '#8899a6';
-      const tooltipBg = isLight ? '#ffffff' : '#151b23';
-      const tooltipTitle = isLight ? '#1a1a1a' : '#f0f4f8';
-      const tooltipBody = isLight ? '#5a5a5a' : '#8899a6';
-      const tooltipBorder = isLight ? '#e5e3e0' : '#1e2730';
-
-      state.charts.intraday = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: t('input'),
-              data: inputData,
-              borderColor: '#4ecdc4',
-              backgroundColor: 'rgba(78, 205, 196, 0.1)',
-              borderWidth: 2,
-              tension: 0.3,
-              fill: true
-            },
-            {
-              label: t('output'),
-              data: outputData,
-              borderColor: '#c8ff00',
-              backgroundColor: 'rgba(200, 255, 0, 0.1)',
-              borderWidth: 2,
-              tension: 0.3,
-              fill: true
-            },
-            {
-              label: t('total'),
-              data: totalData,
-              borderColor: '#ff6b6b',
-              backgroundColor: 'rgba(255, 107, 107, 0.1)',
-              borderWidth: 2,
-              tension: 0.3,
-              fill: false
             }
           ]
         },
@@ -2180,7 +2013,7 @@
       `;
     }
 
-    function renderHourWeekdayHeatmap(matrix, hourly) {
+    function renderHourWeekdayHeatmap(matrix) {
       if (!matrix || matrix.length === 0) return '';
       const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
       const maxVal = Math.max(...matrix.flat(), 1);
@@ -2271,7 +2104,7 @@
       `;
     }
 
-    function renderAutonomyTrend(trend) {
+    function renderAutonomyTrend() {
       return `
         <div class="section">
           <div class="section-header">
@@ -2316,7 +2149,7 @@
       });
     }
 
-    function renderThinkingAnalysis(thinkingStats, daily) {
+    function renderThinkingAnalysis(thinkingStats) {
       if (!thinkingStats || !thinkingStats.total_turns) return '';
 
       const byProject = (thinkingStats.by_project || []).slice(0, 8);
@@ -2547,14 +2380,6 @@
         });
       });
 
-      // Intraday date selector (deprecated)
-      document.querySelectorAll('.date-btn[data-date]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          state.selectedDate = btn.dataset.date;
-          render();
-        });
-      });
-
       // Chart date range picker
       const dateStart = document.getElementById('dateStart');
       const dateEnd = document.getElementById('dateEnd');
@@ -2598,7 +2423,7 @@
 
       // Heatmap tooltips
       document.querySelectorAll('.heatmap-cell[data-date]').forEach(cell => {
-        cell.addEventListener('mouseenter', (e) => {
+        cell.addEventListener('mouseenter', () => {
           const date = cell.dataset.date;
           const tokens = parseInt(cell.dataset.tokens);
           const d = new Date(date + 'T00:00:00');  // 本地零点，避免 UTC 解析偏差一天

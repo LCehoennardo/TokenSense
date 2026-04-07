@@ -12,7 +12,49 @@ PROJECTS_DIR = Path.home() / ".claude" / "projects"
 OUTPUT_JS = Path(__file__).parent.parent / "data" / "token_data.js"
 CACHE_FILE = Path(__file__).parent.parent / "data" / ".session_cache.json"
 SUMMARY_CACHE_FILE = Path(__file__).parent.parent / "data" / ".summary_cache.json"
-CACHE_VERSION = "v5"  # 递增此值以使旧缓存失效
+CACHE_VERSION = "v6"  # 递增此值以使旧缓存失效
+
+
+def normalize_project_name(dir_name):
+    """规范化项目名称，提取简洁易读的名称。
+
+    Claude Code 项目目录格式: -Users-用户名-机器名-项目名
+    例如: -Users-chenjialian-dev-TokenSense -> TokenSense
+          /Users/chenjialian/Dev -> Dev
+          occwork----------- -> occwork
+    """
+    if not dir_name:
+        return "Unknown"
+
+    # 移除 (subagent) 后缀
+    base_name = dir_name.replace(" (subagent)", "").replace(" (subagent)", "")
+
+    # 处理 Claude Code 格式: -Users-username-machine-projectname
+    if base_name.startswith("-Users-"):
+        parts = base_name.split("-")
+        # 格式: ['', 'Users', 'username', 'machine', 'project', ...]
+        if len(parts) >= 5:
+            # 取最后剩余的部分作为项目名
+            name = "-".join(parts[4:])
+        elif len(parts) >= 4:
+            name = parts[3]
+        else:
+            name = base_name
+    else:
+        # 处理绝对路径格式: /Users/chenjialian/Dev
+        if "/" in base_name:
+            name = base_name.rsplit("/", 1)[-1]
+        else:
+            name = base_name
+
+    # 清理多余的连字符，只保留一个
+    import re
+    name = re.sub(r'-+', '-', name)
+    # 如果以连字符开头或结尾，移除
+    name = name.strip('-')
+
+    return name or "Unknown"
+
 
 # ── 模型定价（$/M tokens，唯一权威来源） ──────────────────────────
 MODEL_PRICING = {
@@ -108,7 +150,7 @@ def parse_all_sessions():
         if not project_dir.is_dir():
             continue
 
-        project_name = project_dir.name
+        project_name = normalize_project_name(project_dir.name)
 
         # 扫描主 session 文件
         for jsonl_file in project_dir.glob("*.jsonl"):
@@ -127,6 +169,8 @@ def parse_all_sessions():
                 #   - 未出现在 new_cache 的旧 key 会被自动丢弃（清理删除的文件）
                 new_cache[cache_key] = {"mtime": mtime, "data": session_data}
                 if session_data:
+                    # 规范化项目名（移除 subagent 后缀等）
+                    session_data["project"] = normalize_project_name(session_data.get("project", ""))
                     sessions.append(session_data)
             except Exception as e:
                 print(f"解析失败 {jsonl_file.name}: {e}")
@@ -153,6 +197,8 @@ def parse_all_sessions():
                             misses += 1
                         new_cache[cache_key] = {"mtime": mtime, "data": session_data}
                         if session_data:
+                            # 规范化项目名（移除 subagent 后缀等）
+                            session_data["project"] = normalize_project_name(session_data.get("project", ""))
                             sessions.append(session_data)
                     except Exception as e:
                         print(f"解析失败 {subagent_file.name}: {e}")
@@ -598,13 +644,14 @@ def _compute_hourly_stats(sessions):
 
 
 def _compute_project_stats(sessions):
-    """计算项目聚合统计（含费用）。"""
+    """计算项目聚合统计（含费用），将子agent消耗合并到主项目。"""
     projects = defaultdict(lambda: {
         "input_tokens": 0, "output_tokens": 0,
         "cache_creation": 0, "cache_read": 0, "sessions": 0,
     })
     for s in sessions:
-        p = s["project"]
+        # 使用规范化名称，并将子agent合并到主项目
+        p = normalize_project_name(s["project"])
         projects[p]["input_tokens"] += s["input_tokens"]
         projects[p]["output_tokens"] += s["output_tokens"]
         projects[p]["cache_creation"] += s["cache_creation_input_tokens"]
