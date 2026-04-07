@@ -434,6 +434,7 @@
       countdown: REFRESH_INTERVAL,
       heatmapView: 'month',
       theme: localStorage.getItem('theme') || 'dark',
+      lang: localStorage.getItem('lang') || 'en',
       activeTab: 'tokens',  // 'tokens' | 'costs' | 'behavior' | 'tools'
       showExtraCols: false,   // toggle extra session table columns
       projectCostView: 'est', // 'est' | 'real'
