@@ -65,8 +65,41 @@ TokenSense/
 │   ├── token_data.js                 # Python 脚本生成
 │   ├── .session_cache.json           # 会话解析缓存
 │   └── .summary_cache.json           # 汇总缓存
-└── docs/                             # 文档
+├── docs/                             # 文档
+└── skills/                           # Claude Code Skills
+    └── token-insights/               # 静态报告生成器
+        ├── SKILL.md                  # Skill 定义
+        ├── generate_report.py        # 报告生成脚本
+        └── templates/
+            └── report.html           # 静态 HTML 模板
 ```
+
+## Token-Insights Skill
+
+生成一次性、静态 HTML 报告（类似 `/insights` 命令）。
+
+### 安装
+
+```bash
+# 复制 skill 到 Claude Code skills 目录
+cp -r skills/token-insights ~/.claude/skills/
+```
+
+### 使用方法
+
+在 Claude Code 中运行：
+
+```
+/token-insights
+```
+
+Skill 会生成报告并保存到 `~/.claude/skills/token-insights/output/token-insights-{timestamp}.html`。
+
+**功能特点：**
+- 单个静态 HTML 文件，数据内嵌
+- 无需服务器，无自动刷新
+- 展示：Token 总量、费用预估、每日图表、项目/模型排行、会话历史
+- 适合分享或定期报告
 
 ## 命令
 
