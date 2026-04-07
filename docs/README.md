@@ -8,9 +8,11 @@
 [![Python Version](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![ Claude Code](https://img.shields.io/badge/Claude%20Code-Supported-purple.svg)](https://claude.com/code)
 
+[中文](./README.zh.md)
+
 A visualization tool for Claude Code token usage. Parse session logs and generate an interactive HTML dashboard showing token consumption patterns.
 
-[中文](./README.zh.md)
+![Demo Screenshot](./images/screenshot-demo-en.png)
 
 ## What is this?
 

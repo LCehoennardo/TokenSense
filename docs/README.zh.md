@@ -8,9 +8,11 @@
 [![Python 版本](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Supported-purple.svg)](https://claude.com/code)
 
+[English](./README.md)
+
 Claude Code Token 使用可视化工具。解析会话日志并生成交互式 HTML 仪表板，展示 Token 消耗模式。
 
-[English](./README.md)
+![Demo Screenshot](./images/screenshot-demo-zh.png)
 
 ## 这是什么？
 
