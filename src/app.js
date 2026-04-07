@@ -31,6 +31,8 @@
         of_sessions: 'of sessions',
         intraday_timeline: 'Intraday Timeline',
         daily_usage: 'Daily Usage',
+        daily_btn: 'Daily',
+        hourly_btn: 'Hourly',
         days_badge: 'days',
         activity_heatmap: 'Activity Heatmap',
         less: 'Less',
@@ -227,6 +229,8 @@
         of_sessions: '的会话占比',
         intraday_timeline: '日内时间线',
         daily_usage: '每日用量',
+        daily_btn: '按日',
+        hourly_btn: '按时',
         days_badge: '天',
         activity_heatmap: '活动热力图',
         less: '少',
@@ -437,7 +441,10 @@
       activeTab: 'tokens',  // 'tokens' | 'costs' | 'behavior' | 'tools'
       showExtraCols: false,   // toggle extra session table columns
       projectCostView: 'est', // 'est' | 'real'
-      charts: {}              // Chart.js instances keyed by name
+      charts: {},              // Chart.js instances keyed by name
+      chartMode: 'daily',     // 'daily' | 'hourly'
+      dateRangeStart: '',     // 开始日期
+      dateRangeEnd: ''        // 结束日期
     };
 
     // ═══════════════════════════════════════════════════════════
@@ -682,8 +689,7 @@
           ${tabNav}
           <div class="content-left">
             ${renderHero(summary)}
-            ${renderIntradayChart(sessions)}
-            ${renderChart(summary.daily)}
+            ${renderChart(summary.daily, summary.hourly_timeline || [])}
             ${renderHeatmap(summary.daily)}
             ${renderSessionsTable(sessions)}
           </div>
@@ -694,8 +700,7 @@
           </div>
         `;
 
-        initChart(summary.daily);
-        initIntradayChart(sessions);
+        initChart(summary.daily, summary.hourly_timeline || []);
       } else if (state.activeTab === 'costs') {
         main.innerHTML = `
           ${tabNav}
@@ -879,12 +884,47 @@
       `;
     }
 
-    function renderChart(daily) {
+    function renderChart(daily, hourly) {
+      const rangeStart = state.dateRangeStart || '';
+      const rangeEnd = state.dateRangeEnd || '';
+      const mode = state.chartMode;
+
+      let minDate = '', maxDate = '';
+      if (hourly && hourly.length > 0) {
+        const dates = [...new Set(hourly.map(h => h.hour.slice(0, 10)))].sort();
+        minDate = dates[0];
+        maxDate = dates[dates.length - 1];
+      } else if (daily && daily.length > 0) {
+        const dates = daily.map(d => d.date).sort();
+        minDate = dates[0];
+        maxDate = dates[dates.length - 1];
+      }
+
+      let startDate = rangeStart;
+      let endDate = rangeEnd;
+      if (!startDate && !endDate && maxDate) {
+        endDate = maxDate;
+        const d = new Date(maxDate);
+        d.setDate(d.getDate() - 6);
+        startDate = d.toISOString().slice(0, 10);
+      }
+
+      const countLabel = mode === 'hourly' ? (hourly ? hourly.length : 0) + ' hours' : daily.length + ' ' + t('days_badge');
+
       return `
         <div class="section">
           <div class="section-header">
             <div class="section-title">${t('daily_usage')}</div>
-            <div class="section-badge">${daily.length} ${t('days_badge')}</div>
+            <div class="chart-controls">
+              <div class="date-range-picker">
+                <input type="date" id="dateStart" class="date-picker" value="${startDate}" min="${minDate}" max="${maxDate}">
+                <span class="date-separator">—</span>
+                <input type="date" id="dateEnd" class="date-picker" value="${endDate}" min="${minDate}" max="${maxDate}">
+              </div>
+              <button class="chart-mode-btn ${mode === 'daily' ? 'active' : ''}" data-mode="daily">${t('daily_btn') || '日'}</button>
+              <button class="chart-mode-btn ${mode === 'hourly' ? 'active' : ''}" data-mode="hourly">${t('hourly_btn') || '时'}</button>
+            </div>
+            <div class="section-badge">${countLabel}</div>
           </div>
           <div class="chart-container">
             <canvas id="dailyChart"></canvas>
@@ -893,13 +933,39 @@
       `;
     }
 
-    function initChart(daily) {
+    function initChart(daily, hourly) {
       const ctx = document.getElementById('dailyChart');
       if (!ctx) return;
 
-      const labels = daily.map(d => d.date.slice(5));
-      const inputData = daily.map(d => d.input_tokens);
-      const outputData = daily.map(d => d.output_tokens);
+      let chartData = daily;
+      let isHourly = false;
+
+      if (state.chartMode === 'hourly' && hourly && hourly.length > 0) {
+        chartData = hourly;
+        isHourly = true;
+      }
+
+      const startDate = state.dateRangeStart;
+      const endDate = state.dateRangeEnd;
+
+      if (startDate || endDate) {
+        chartData = chartData.filter(d => {
+          const dateStr = isHourly ? d.hour.slice(0, 10) : d.date;
+          if (startDate && dateStr < startDate) return false;
+          if (endDate && dateStr > endDate) return false;
+          return true;
+        });
+      }
+
+      if (isHourly) {
+        chartData.sort((a, b) => a.hour.localeCompare(b.hour));
+      } else {
+        chartData.sort((a, b) => a.date.localeCompare(b.date));
+      }
+
+      const labels = chartData.map(d => isHourly ? d.hour.slice(5) : d.date.slice(5));
+      const inputData = chartData.map(d => d.input_tokens);
+      const outputData = chartData.map(d => d.output_tokens);
 
       if (state.charts.daily) state.charts.daily.destroy();
 
@@ -912,23 +978,33 @@
       const tooltipBody = isLight ? '#5a5a5a' : '#8899a6';
       const tooltipBorder = isLight ? '#e5e3e0' : '#1e2730';
 
+      const chartType = isHourly ? 'line' : 'bar';
+
       state.charts.daily = new Chart(ctx, {
-        type: 'bar',
+        type: chartType,
         data: {
           labels,
           datasets: [
             {
               label: t('input'),
               data: inputData,
-              backgroundColor: '#4ecdc4',
-              borderRadius: 4,
+              backgroundColor: isHourly ? 'rgba(78, 205, 196, 0.1)' : '#4ecdc4',
+              borderColor: '#4ecdc4',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: isHourly,
+              borderRadius: isHourly ? 0 : 4,
               barPercentage: 0.7
             },
             {
               label: t('output'),
               data: outputData,
-              backgroundColor: '#c8ff00',
-              borderRadius: 4,
+              backgroundColor: isHourly ? 'rgba(200, 255, 0, 0.1)' : '#c8ff00',
+              borderColor: '#c8ff00',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: isHourly,
+              borderRadius: isHourly ? 0 : 4,
               barPercentage: 0.7
             }
           ]
@@ -962,7 +1038,12 @@
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: textColor, font: { family: 'JetBrains Mono', size: 9 } }
+              ticks: {
+                color: textColor,
+                font: { family: 'JetBrains Mono', size: 9 },
+                maxTicksLimit: isHourly ? 48 : 12,
+                maxRotation: isHourly ? 45 : 0
+              }
             },
             y: {
               grid: { color: gridColor },
@@ -1070,7 +1151,12 @@
           scales: {
             x: {
               grid: { display: false },
-              ticks: { color: textColor, font: { family: 'JetBrains Mono', size: 9 } }
+              ticks: {
+                color: textColor,
+                font: { family: 'JetBrains Mono', size: 9 },
+                maxTicksLimit: isHourly ? 48 : 12,
+                maxRotation: isHourly ? 45 : 0
+              }
             },
             y: {
               grid: { color: gridColor },
@@ -2461,10 +2547,51 @@
         });
       });
 
-      // Intraday date selector
+      // Intraday date selector (deprecated)
       document.querySelectorAll('.date-btn[data-date]').forEach(btn => {
         btn.addEventListener('click', () => {
           state.selectedDate = btn.dataset.date;
+          render();
+        });
+      });
+
+      // Chart date range picker
+      const dateStart = document.getElementById('dateStart');
+      const dateEnd = document.getElementById('dateEnd');
+      if (dateStart) {
+        dateStart.addEventListener('change', (e) => {
+          state.dateRangeStart = e.target.value;
+          render();
+        });
+      }
+      if (dateEnd) {
+        dateEnd.addEventListener('change', (e) => {
+          state.dateRangeEnd = e.target.value;
+          render();
+        });
+      }
+
+      // Chart mode toggle
+      document.querySelectorAll('.chart-mode-btn[data-mode]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const newMode = btn.dataset.mode;
+
+          // Set default date range based on mode
+          if (newMode === 'daily') {
+            // Daily: last 7 days
+            const today = new Date();
+            const weekAgo = new Date(today);
+            weekAgo.setDate(weekAgo.getDate() - 6);
+            state.dateRangeEnd = today.toISOString().slice(0, 10);
+            state.dateRangeStart = weekAgo.toISOString().slice(0, 10);
+          } else if (newMode === 'hourly') {
+            // Hourly: today only
+            const today = new Date().toISOString().slice(0, 10);
+            state.dateRangeStart = today;
+            state.dateRangeEnd = today;
+          }
+
+          state.chartMode = newMode;
           render();
         });
       });

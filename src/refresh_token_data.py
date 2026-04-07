@@ -12,7 +12,7 @@ PROJECTS_DIR = Path.home() / ".claude" / "projects"
 OUTPUT_JS = Path(__file__).parent.parent / "data" / "token_data.js"
 CACHE_FILE = Path(__file__).parent.parent / "data" / ".session_cache.json"
 SUMMARY_CACHE_FILE = Path(__file__).parent.parent / "data" / ".summary_cache.json"
-CACHE_VERSION = "v4"  # 递增此值以使旧缓存失效
+CACHE_VERSION = "v5"  # 递增此值以使旧缓存失效
 
 # ── 模型定价（$/M tokens，唯一权威来源） ──────────────────────────
 MODEL_PRICING = {
@@ -110,6 +110,7 @@ def parse_all_sessions():
 
         project_name = project_dir.name
 
+        # 扫描主 session 文件
         for jsonl_file in project_dir.glob("*.jsonl"):
             cache_key = str(jsonl_file)
             try:
@@ -129,6 +130,32 @@ def parse_all_sessions():
                     sessions.append(session_data)
             except Exception as e:
                 print(f"解析失败 {jsonl_file.name}: {e}")
+
+        # 扫描子 agent session 文件 (session目录/subagents/ 目录)
+        for jsonl_file in project_dir.glob("*.jsonl"):
+            session_id = jsonl_file.stem
+            session_subagents_dir = project_dir / session_id / "subagents"
+            if session_subagents_dir.is_dir():
+                for subagent_file in session_subagents_dir.glob("*.jsonl"):
+                    # 跳过 .meta.json 文件
+                    if subagent_file.name.endswith(".meta.json"):
+                        continue
+                    cache_key = str(subagent_file)
+                    try:
+                        mtime = subagent_file.stat().st_mtime
+                        entry = cache.get(cache_key)
+                        if entry and entry.get("mtime") == mtime:
+                            session_data = entry["data"]
+                            hits += 1
+                        else:
+                            # 子 agent 使用特殊的项目名：原项目名 + " (subagent)"
+                            session_data = parse_session_file(subagent_file, f"{project_name} (subagent)")
+                            misses += 1
+                        new_cache[cache_key] = {"mtime": mtime, "data": session_data}
+                        if session_data:
+                            sessions.append(session_data)
+                    except Exception as e:
+                        print(f"解析失败 {subagent_file.name}: {e}")
 
     _save_cache(new_cache)
     all_cached = (misses == 0 and hits > 0)
@@ -409,7 +436,7 @@ def parse_session_file(jsonl_path, project_name):
 
     result = {
         "id": session_id,
-        "project": display_project,
+        "project": project_name,
         "project_path": cwd,
         "start_time": first_timestamp.isoformat() if first_timestamp else "",
         "start_time_str": local_start.strftime("%Y-%m-%d %H:%M") if local_start else "",
@@ -527,6 +554,47 @@ def _compute_daily_stats(sessions):
         daily_list.append(item)
 
     return daily_list
+
+
+def _compute_hourly_stats(sessions):
+    """计算每小时聚合统计。"""
+    hourly = defaultdict(lambda: {
+        "input_tokens": 0, "output_tokens": 0, "cache_creation": 0,
+        "cache_read": 0, "sessions": 0, "duration": 0,
+    })
+    for s in sessions:
+        dt = s.get("start_time")
+        if dt and s.get("date"):
+            try:
+                dt_obj = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+                # 使用本地时间的小时
+                local_dt = dt_obj.astimezone()
+                hour_key = f"{s['date']} {local_dt.hour:02d}:00"
+                hourly[hour_key]["input_tokens"] += s["input_tokens"]
+                hourly[hour_key]["output_tokens"] += s["output_tokens"]
+                hourly[hour_key]["cache_creation"] += s["cache_creation_input_tokens"]
+                hourly[hour_key]["cache_read"] += s["cache_read_input_tokens"]
+                hourly[hour_key]["sessions"] += 1
+                hourly[hour_key]["duration"] += s["duration_minutes"]
+            except Exception:
+                pass
+
+    hourly_list = []
+    for h in sorted(hourly.keys()):
+        v = hourly[h]
+        item = {
+            "hour": h,
+            "input_tokens": v["input_tokens"],
+            "output_tokens": v["output_tokens"],
+            "cache_creation": v["cache_creation"],
+            "cache_read": v["cache_read"],
+            "total_tokens": v["input_tokens"] + v["output_tokens"],
+            "sessions": v["sessions"],
+            "duration_minutes": v["duration"],
+        }
+        hourly_list.append(item)
+
+    return hourly_list
 
 
 def _compute_project_stats(sessions):
@@ -930,6 +998,7 @@ def compute_summary(sessions):
     """计算汇总数据（委托给各子函数）。"""
     basic = _compute_basic_totals(sessions)
     daily_list = _compute_daily_stats(sessions)
+    hourly_list = _compute_hourly_stats(sessions)
     project_list = _compute_project_stats(sessions)
     model_list = _compute_model_stats(sessions)
     tool_stats = _compute_tool_stats(sessions)
@@ -949,6 +1018,7 @@ def compute_summary(sessions):
         **basic,
         "model_pricing": MODEL_PRICING,
         "daily": daily_list,
+        "hourly_timeline": hourly_list,
         "projects": project_list,
         "models": model_list,
         **tool_stats,
@@ -1414,6 +1484,7 @@ def refresh_once():
         "date_range": date_range,
         "model_pricing": MODEL_PRICING,  # JS 唯一定价来源
         "daily": daily_list,
+        "hourly_timeline": hourly_list,
         "projects": project_list,
         "models": model_list,
         # 工具统计

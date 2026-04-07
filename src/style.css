@@ -9,6 +9,7 @@
       --bg-card: #0f1419;
       --bg-elevated: #151b23;
       --bg-hover: #1a222c;
+      --bg-secondary: #151b23;
       --text-primary: #f0f4f8;
       --text-secondary: #8899a6;
       --text-muted: #4a5568;
@@ -199,7 +200,7 @@
       align-items: center;
       gap: 24px;
       font-size: 11px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
     .live-indicator {
@@ -356,7 +357,7 @@
       font-weight: 600;
       letter-spacing: 2px;
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       margin-bottom: 8px;
     }
 
@@ -396,7 +397,7 @@
       transition: background 0.3s ease;
     }
 
-    .breakdown-label { color: var(--text-muted); }
+    .breakdown-label { color: var(--text-secondary); }
     .breakdown-value { font-weight: 700; }
 
     .breakdown-item.input .breakdown-value { color: var(--accent-cool); }
@@ -456,7 +457,7 @@
     .metric-card.cost-card .metric-value { color: var(--accent-purple); }
     .metric-sub {
       font-size: 10px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       margin-top: 2px;
     }
 
@@ -485,7 +486,7 @@
       font-weight: 600;
       letter-spacing: 1px;
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       margin-bottom: 4px;
     }
 
@@ -520,6 +521,147 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chart-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* 日期范围选择器容器 - 现代化卡片设计 */
+    .date-range-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      padding: 6px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .date-picker {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      color-scheme: dark light;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      min-width: 130px;
+      text-align: center;
+    }
+
+    .date-picker::-webkit-calendar-picker-indicator {
+      filter: invert(0.7);
+      cursor: pointer;
+      padding-left: 8px;
+    }
+
+    [data-theme="light"] .date-picker::-webkit-calendar-picker-indicator,
+    .light-theme .date-picker::-webkit-calendar-picker-indicator {
+      filter: invert(0.3);
+    }
+
+    .date-picker:hover {
+      border-color: var(--accent-cool);
+      transform: translateY(-1px);
+    }
+
+    .date-picker:focus {
+      outline: none;
+      border-color: var(--accent-cool);
+      box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.2);
+    }
+
+    /* 日期分隔符 - 更精致的设计 */
+    .date-separator {
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      opacity: 0.5;
+      user-select: none;
+      margin: 0 2px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       图表模式切换按钮 - 现代设计
+    ═══════════════════════════════════════════════════════════ */
+    .chart-mode-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 8px 18px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', 'SF Mono', monospace;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .chart-mode-btn:hover {
+      border-color: var(--accent-cool);
+      color: var(--text-primary);
+      transform: translateY(-2px);
+      box-shadow:
+        0 6px 16px rgba(78, 205, 196, 0.2),
+        0 3px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .chart-mode-btn.active {
+      background: linear-gradient(135deg, rgba(78, 205, 196, 0.18) 0%, rgba(78, 205, 196, 0.06) 100%);
+      border-color: var(--accent-cool);
+      color: var(--accent-cool);
+      font-weight: 700;
+      box-shadow:
+        0 0 24px rgba(78, 205, 196, 0.25),
+        0 4px 12px rgba(78, 205, 196, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    }
+
+    /* 日期范围预设按钮 */
+    .date-presets {
+      display: flex;
+      gap: 4px;
+    }
+
+    .preset-btn {
+      background: var(--bg-primary);
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .preset-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-hover);
+    }
+
+    .preset-btn.active {
+      color: var(--accent-cool);
+      border-color: var(--accent-cool);
+      background: rgba(78, 205, 196, 0.1);
     }
 
     .section-title {
@@ -547,7 +689,7 @@
       padding: 4px 8px;
       background: var(--bg-elevated);
       border-radius: 4px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       transition: background 0.3s ease;
     }
 
@@ -571,7 +713,7 @@
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 6px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.2s ease;
     }
@@ -628,7 +770,7 @@
       gap: 6px;
       margin-top: 16px;
       font-size: 10px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
     .legend-cell {
@@ -688,7 +830,7 @@
 
     .project-sessions {
       font-size: 10px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
     /* Models */
@@ -709,7 +851,7 @@
     }
 
     .model-stats {
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
     /* Tab Navigation */
@@ -727,10 +869,10 @@
       font-size: 11px;
       font-weight: 600;
       padding: 8px 16px;
-      background: transparent;
-      border: none;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.2s ease;
       display: flex;
@@ -954,7 +1096,7 @@
     }
 
     .bash-cmd-count {
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
     .bash-cmd-errors {
@@ -978,7 +1120,7 @@
 
     .table-info {
       font-size: 12px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
     .table-info strong {
@@ -1024,7 +1166,7 @@
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       background: var(--bg-elevated);
       cursor: pointer;
       transition: color 0.2s, background 0.3s ease;
@@ -1062,9 +1204,9 @@
     .col-output { color: var(--accent-lime); }
     .col-cache { color: var(--accent-gold); }
     .col-cost { text-align: right; color: var(--accent-purple); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
-    .col-duration { text-align: right; color: var(--text-muted); }
-    .col-model { color: var(--text-muted); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .col-prompt { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-style: italic; }
+    .col-duration { text-align: right; color: var(--text-secondary); }
+    .col-model { color: var(--text-secondary); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .col-prompt { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-style: italic; }
     .cost-highlight { color: var(--accent-purple); }
 
     /* Cache Analysis */
@@ -1081,7 +1223,7 @@
       font-size: 11px;
     }
     .cache-stat-label {
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
     .cache-stat-value {
       font-family: 'Outfit', sans-serif;
@@ -1190,7 +1332,7 @@
       align-items: center;
       justify-content: center;
       padding: 80px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       gap: 16px;
     }
 
@@ -1308,7 +1450,7 @@
       min-width: 40px;
       text-align: right;
       font-size: 10px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
     }
 
     /* Two-column grid inside a section */
@@ -1324,7 +1466,7 @@
     .eff-table th {
       text-align: left;
       padding: 8px 10px;
-      color: var(--text-muted);
+      color: var(--text-secondary);
       font-weight: 600;
       border-bottom: 1px solid var(--border);
       white-space: nowrap;
@@ -1338,7 +1480,7 @@
     .eff-table .num { text-align: right; font-family: 'JetBrains Mono', monospace; }
     .eff-table .bold { font-weight: 700; color: var(--text-primary); }
     .eff-table .cost-cell { color: var(--accent-purple); font-weight: 700; }
-    .eff-table .na { color: var(--text-muted); font-style: italic; }
+    .eff-table .na { color: var(--text-secondary); font-style: italic; }
 
     /* Hour × Weekday heatmap */
     .hw-heatmap { overflow-x: auto; margin-top: 8px; }
@@ -1358,8 +1500,8 @@
     .hw-cell[data-level="3"] { background: rgba(255,107,107,0.50); }
     .hw-cell[data-level="4"] { background: rgba(255,107,107,0.70); }
     .hw-cell[data-level="5"] { background: var(--accent-hot); }
-    .hw-label { font-size: 9px; color: var(--text-muted); text-align: center; padding: 0 2px; }
-    .hw-row-label { font-size: 9px; color: var(--text-muted); padding-right: 6px; white-space: nowrap; }
+    .hw-label { font-size: 9px; color: var(--text-secondary); text-align: center; padding: 0 2px; }
+    .hw-row-label { font-size: 9px; color: var(--text-secondary); padding-right: 6px; white-space: nowrap; }
 
     /* Version timeline */
     .version-timeline { display: flex; align-items: center; flex-wrap: wrap; gap: 0; margin-top: 8px; }
@@ -1380,8 +1522,8 @@
       color: var(--text-primary);
       font-family: 'JetBrains Mono', monospace;
     }
-    .version-date { font-size: 9px; color: var(--text-muted); }
-    .version-arrow { font-size: 16px; color: var(--text-muted); margin: 0 4px; align-self: center; }
+    .version-date { font-size: 9px; color: var(--text-secondary); }
+    .version-arrow { font-size: 16px; color: var(--text-secondary); margin: 0 4px; align-self: center; }
 
     /* Streak calendar */
     .streak-grid { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 8px; }
@@ -1422,7 +1564,7 @@
     }
     .perm-badge.bypass { background: rgba(255,107,107,0.15); color: var(--accent-hot); }
     .perm-badge.accept { background: rgba(78,205,196,0.15); color: var(--accent-cool); }
-    .perm-badge.default { background: var(--bg-elevated); color: var(--text-muted); }
+    .perm-badge.default { background: var(--bg-elevated); color: var(--text-secondary); }
     .perm-badge.plan { background: rgba(167,139,250,0.15); color: var(--accent-purple); }
 
     /* Stability cards */
@@ -1445,7 +1587,7 @@
       color: var(--text-primary);
     }
     .stability-num.warn { color: var(--accent-hot); }
-    .stability-label { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+    .stability-label { font-size: 10px; color: var(--text-secondary); margin-top: 4px; }
 
     /* Time distribution buckets */
     .bucket-grid {
@@ -1466,5 +1608,5 @@
       font-weight: 800;
       color: var(--accent-cool);
     }
-    .bucket-label { font-size: 9px; color: var(--text-muted); margin-top: 3px; }
+    .bucket-label { font-size: 9px; color: var(--text-secondary); margin-top: 3px; }
 
