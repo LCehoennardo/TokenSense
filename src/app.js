@@ -576,10 +576,12 @@
     }
 
     function formatTime(isoString) {
+      if (!isoString) return '';
       try {
         const d = new Date(isoString);
+        if (isNaN(d.getTime())) return '';
         return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      } catch { return isoString; }
+      } catch { return ''; }
     }
 
     function formatDuration(mins) {
@@ -596,7 +598,9 @@
         state.sessions = window.TOKEN_DATA.sessions || [];
         state.currentPage = 1;
         render();
-        document.getElementById('lastUpdated').textContent = formatTime(window.TOKEN_DATA.updated_at);
+        if (window.TOKEN_DATA.updated_at) {
+          document.getElementById('lastUpdated').textContent = formatTime(window.TOKEN_DATA.updated_at);
+        }
       } else {
         showError('Failed to load data');
       }
@@ -818,14 +822,14 @@
             <div class="metric-card" style="--card-accent: var(--accent-cool, #06b6d4);">
               <div class="metric-icon">⏱</div>
               <div class="metric-label">${t('ai_compute_time')}</div>
-              <div class="metric-value">${s.turn_duration_stats ? s.turn_duration_stats.total_hours.toFixed(1) + t('hr') : '—'}</div>
+              <div class="metric-value">${s.turn_duration_stats && s.turn_duration_stats.total_hours ? s.turn_duration_stats.total_hours.toFixed(1) + t('hr') : '—'}</div>
               <div class="metric-sub">${s.turn_duration_stats && s.turn_duration_stats.avg_ms ? t('avg_per_turn') + ' ' + (s.turn_duration_stats.avg_ms / 60000).toFixed(1) + ' ' + t('min_per_turn') : ''}</div>
             </div>
             <div class="metric-card" style="--card-accent: var(--accent-purple, #a855f7);">
               <div class="metric-icon">🧠</div>
               <div class="metric-label">${t('extended_thinking')}</div>
               <div class="metric-value">${s.thinking_stats ? s.thinking_stats.sessions_with_thinking : '—'}</div>
-              <div class="metric-sub">${s.thinking_stats ? s.thinking_stats.pct_sessions.toFixed(0) + '% ' + t('of_sessions') : ''}</div>
+              <div class="metric-sub">${s.thinking_stats && s.thinking_stats.pct_sessions != null ? (typeof s.thinking_stats.pct_sessions === 'string' ? s.thinking_stats.pct_sessions : s.thinking_stats.pct_sessions.toFixed(0)) + '% ' + t('of_sessions') : ''}</div>
             </div>
           </div>
         </div>
@@ -838,14 +842,18 @@
       const mode = state.chartMode;
 
       let minDate = '', maxDate = '';
-      if (hourly && hourly.length > 0) {
-        const dates = [...new Set(hourly.map(h => h.hour.slice(0, 10)))].sort();
-        minDate = dates[0];
-        maxDate = dates[dates.length - 1];
-      } else if (daily && daily.length > 0) {
+      if (daily && daily.length > 0 && daily[0].date) {
         const dates = daily.map(d => d.date).sort();
         minDate = dates[0];
         maxDate = dates[dates.length - 1];
+      } else if (hourly && hourly.length > 0 && hourly[0].hour) {
+        // hourly_timeline uses "HH:00" format, not dates — extract dates from hour strings that look like dates
+        const dateEntries = hourly.filter(h => h.hour && h.hour.includes('-')).map(h => h.hour.slice(0, 10));
+        const uniqueDates = [...new Set(dateEntries)].sort();
+        if (uniqueDates.length > 0) {
+          minDate = uniqueDates[0];
+          maxDate = uniqueDates[uniqueDates.length - 1];
+        }
       }
 
       let startDate = rangeStart;
@@ -898,7 +906,12 @@
 
       if (startDate || endDate) {
         chartData = chartData.filter(d => {
-          const dateStr = isHourly ? d.hour.slice(0, 10) : d.date;
+          if (isHourly) {
+            // hourly_timeline is aggregated across all days (24 entries: "00:00"-"23:00")
+            // Don't filter by date — just show all hours
+            return true;
+          }
+          const dateStr = d.date;
           if (startDate && dateStr < startDate) return false;
           if (endDate && dateStr > endDate) return false;
           return true;
@@ -911,7 +924,7 @@
         chartData.sort((a, b) => a.date.localeCompare(b.date));
       }
 
-      const labels = chartData.map(d => isHourly ? d.hour.slice(5) : d.date.slice(5));
+      const labels = chartData.map(d => isHourly ? d.hour : d.date.slice(5));
       const inputData = chartData.map(d => d.input_tokens);
       const outputData = chartData.map(d => d.output_tokens);
 
@@ -2479,9 +2492,7 @@
     function init() {
       initTheme();
       initLang();
-      // Static mode: load data immediately (already in window.TOKEN_DATA)
-      // Server mode: wait for first API response via window.refreshDashboard
-      if (window.IS_STATIC_REPORT) refreshData();
+      refreshData();
       startAutoRefresh();
     }
 

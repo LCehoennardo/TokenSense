@@ -92,11 +92,10 @@
       }
     }
 
-    // Expose hook so app.js can trigger a fetch on countdown
+    // Expose hook so app.js can trigger a fetch
     window.fetchData = loadTokenData;
 
-    // Initial load
-    loadTokenData();
+    // Do NOT call loadTokenData() here — app.js will invoke fetchData() after init
   </script>
   <script src="app.js"></script>
 </body>
