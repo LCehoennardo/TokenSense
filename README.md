@@ -38,10 +38,14 @@ Done. You'll see your token usage dashboard with auto-refresh every 60s.
 Generate a one-time static report directly inside Claude Code:
 
 ```bash
+# Install the skill globally
 cp -r skills/token-insights ~/.claude/skills/
 ```
 
-Then run `/token-insights` in Claude Code.
+After installation:
+- Use `/token-insights` in Claude Code to generate a report
+- Claude will also auto-trigger this skill when you ask about token usage, API costs, or Claude Code activity
+- Reports are generated as self-contained HTML directories — open `index.html` in any browser, no server needed
 
 ## Requirements
 

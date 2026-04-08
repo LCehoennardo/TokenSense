@@ -623,6 +623,15 @@
       document.body.appendChild(script);
     }
 
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function getLevel(tokens, maxTokens) {
       if (tokens === 0) return 0;
       const ratio = tokens / maxTokens;
@@ -1146,8 +1155,8 @@
 
     function renderProjects(projects) {
       const items = projects.slice(0, 10).map(p => `
-        <div class="project-item" data-project="${p.project}">
-          <span class="project-name">${p.project}</span>
+        <div class="project-item" data-project="${escapeHtml(p.project)}">
+          <span class="project-name">${escapeHtml(p.project)}</span>
           <span class="project-tokens">${formatNumber(p.total_tokens)}</span>
           <span class="project-sessions">${p.sessions} ${t('sess')}</span>
         </div>
@@ -1295,7 +1304,7 @@
 
         return `
           <div class="file-ops-item">
-            <span class="file-ops-name" title="${f.file}">${f.file}</span>
+            <span class="file-ops-name" title="${escapeHtml(f.file)}">${escapeHtml(f.file)}</span>
             <div class="file-ops-badges">${badges.join('')}</div>
           </div>
         `;
@@ -1317,7 +1326,7 @@
 
       const items = cmds.slice(0, 8).map(c => `
         <div class="bash-cmd-item">
-          <span class="bash-cmd-name">$ ${c.command}</span>
+          <span class="bash-cmd-name">$ ${escapeHtml(c.command)}</span>
           <span class="bash-cmd-count">${c.count}x</span>
           ${c.errors > 0 ? `<span class="bash-cmd-errors">${c.errors} ${t('errors_suffix')}</span>` : ''}
         </div>
@@ -1369,9 +1378,9 @@
         return `
           <tr>
             <td class="col-date">${s.date} ${s.time}</td>
-            <td class="col-project">${s.project}</td>
+            <td class="col-project">${escapeHtml(s.project)}</td>
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:10px;color:var(--text-secondary)">${tools}</td>
-            <td style="font-size:10px;color:var(--text-muted);max-width:150px;overflow:hidden;text-overflow:ellipsis">${topFile}</td>
+            <td style="font-size:10px;color:var(--text-muted);max-width:150px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(topFile)}</td>
             <td class="col-tokens">${formatTokens(s.total_tokens)}</td>
           </tr>
         `;
@@ -1416,17 +1425,17 @@
       const pageSessions = sorted.slice((state.currentPage - 1) * SESSIONS_PER_PAGE, state.currentPage * SESSIONS_PER_PAGE);
 
       const projectOptions = [...new Set(sessions.map(s => s.project))].sort()
-        .map(p => `<option value="${p}" ${p === state.filterProject ? 'selected' : ''}>${p}</option>`).join('');
+        .map(p => `<option value="${escapeHtml(p)}" ${p === state.filterProject ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
 
       const rows = pageSessions.map(s => {
         const permMap = { bypassPermissions: 'bypass', acceptEdits: 'auto', default: 'default', plan: 'plan' };
         const permLabel = permMap[s.dominant_permission] || s.dominant_permission || 'default';
         const permClass = s.dominant_permission === 'bypassPermissions' ? 'bypass' : s.dominant_permission === 'acceptEdits' ? 'accept' : s.dominant_permission || 'default';
         const permBadge = s.dominant_permission
-          ? `<span class="perm-badge ${permClass}">${permLabel}</span>`
+          ? `<span class="perm-badge ${permClass}">${escapeHtml(permLabel)}</span>`
           : '-';
         const thinkingIcon = s.has_thinking ? '🧠' : '';
-        const branch = s.git_branch ? `<span style="font-size:10px;color:var(--text-muted);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block" title="${s.git_branch}">${s.git_branch}</span>` : '-';
+        const branch = s.git_branch ? `<span style="font-size:10px;color:var(--text-muted);max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block" title="${escapeHtml(s.git_branch)}">${escapeHtml(s.git_branch)}</span>` : '-';
         const avgResp = s.avg_turn_ms > 0 ? (s.avg_turn_ms / 60000).toFixed(1) + 'm' : '-';
         const errCell = s.api_errors > 0 ? `<span style="color:var(--accent-hot)">${s.api_errors}</span>` : '0';
         const extraCols = state.showExtraCols ? `
@@ -1438,17 +1447,17 @@
         ` : '';
         return `
         <tr>
-          <td class="col-date">${s.date} ${s.time}</td>
-          <td class="col-project">${s.project}</td>
+          <td class="col-date">${escapeHtml(s.date)} ${escapeHtml(s.time)}</td>
+          <td class="col-project">${escapeHtml(s.project)}</td>
           <td class="col-tokens col-input">${formatTokens(s.input_tokens)}</td>
           <td class="col-tokens col-output">${formatTokens(s.output_tokens)}</td>
           <td class="col-tokens col-cache">${s.cache_creation_input_tokens > 0 ? formatTokens(s.cache_creation_input_tokens) : '-'}</td>
           <td class="col-tokens">${formatTokens(s.total_tokens)}</td>
           <td class="col-cost">${formatCost(computeCost(s))}</td>
           <td class="col-duration">${formatDuration(s.duration_minutes)}</td>
-          <td class="col-model">${s.model_str || '-'}</td>
+          <td class="col-model">${escapeHtml(s.model_str || '-')}</td>
           ${extraCols}
-          <td class="col-prompt" title="${(s.first_prompt || '--').replace(/"/g, '&quot;')}">${s.first_prompt || '--'}</td>
+          <td class="col-prompt" title="${escapeHtml(s.first_prompt || '--')}">${escapeHtml(s.first_prompt || '--')}</td>
         </tr>
       `}).join('');
 
@@ -1777,7 +1786,7 @@
         const width = (cost / maxCost * 100).toFixed(1);
         return `
           <div class="h-bar-item">
-            <span class="h-bar-label" title="${p.project}">${p.project}</span>
+            <span class="h-bar-label" title="${escapeHtml(p.project)}">${escapeHtml(p.project)}</span>
             <div class="h-bar-track">
               <div class="h-bar-fill cost" style="width:${width}%"></div>
             </div>
@@ -1815,7 +1824,7 @@
 
       const slowest = (tdStats.slowest_sessions || []).map(s => `
         <div class="stat-row">
-          <span class="stat-row-label">${s.project} · ${s.date}</span>
+          <span class="stat-row-label">${escapeHtml(s.project)} · ${escapeHtml(s.date)}</span>
           <span class="stat-row-value hot">${fmtMs(s.avg_turn_ms)}</span>
         </div>
       `).join('');
@@ -1867,7 +1876,7 @@
 
     function renderStabilityReport(stability, daily) {
       const topProjects = (stability.top_compact_projects || []).map(p =>
-        `<div class="stat-row"><span class="stat-row-label">${p.project}</span><span class="stat-row-value">${p.count}x</span></div>`
+        `<div class="stat-row"><span class="stat-row-label">${escapeHtml(p.project)}</span><span class="stat-row-value">${p.count}x</span></div>`
       ).join('');
 
       // Mini daily error sparkline via simple bars
@@ -1916,7 +1925,7 @@
         const realC = realByProject[p.project];
         return `
           <tr>
-            <td class="bold">${p.project}</td>
+            <td class="bold">${escapeHtml(p.project)}</td>
             <td class="num">${p.sessions}</td>
             <td class="num">${formatNumber(p.total_tokens || 0)}</td>
             <td class="num cost-cell">${formatCost(cost)}</td>
@@ -2166,7 +2175,7 @@
         const w = (p.turns / maxTurns * 100).toFixed(1);
         return `
           <div class="h-bar-item">
-            <span class="h-bar-label" title="${p.project}">${p.project}</span>
+            <span class="h-bar-label" title="${escapeHtml(p.project)}">${escapeHtml(p.project)}</span>
             <div class="h-bar-track"><div class="h-bar-fill" style="width:${w}%;background:linear-gradient(90deg,var(--accent-purple),#e879f9)"></div></div>
             <span class="h-bar-count">${formatNumber(p.turns)}</span>
           </div>
@@ -2311,12 +2320,13 @@
       }).join('');
 
       const projList = byProject.slice(0, 6).map(p => {
-        const tags = (p.skills || []).map(s =>
-          `<span class="skill-tag">${s.skill} <span class="skill-cnt">×${s.count}</span></span>`
-        ).join('');
+        const tags = (p.skills || []).map(s => {
+          const sn = s.skill || s.name || '';
+          return `<span class="skill-tag">${escapeHtml(sn)} <span class="skill-cnt">×${s.count}</span></span>`;
+        }).join('');
         return `
           <div style="margin-bottom:10px">
-            <div style="font-size:10px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">${p.project}</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">${escapeHtml(p.project)}</div>
             <div>${tags}</div>
           </div>
         `;
