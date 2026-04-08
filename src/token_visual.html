@@ -10,6 +10,31 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/svg+xml" href="../docs/images/icon.svg">
+  <style>
+    /* Server mode indicator */
+    .server-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .server-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-cool);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
 </head>
 <body>
   <header class="header">
@@ -17,6 +42,10 @@
       <img class="logo-img" src="../docs/images/logo.svg" alt="TokenSense" width="180">
     </div>
     <div class="header-meta">
+      <div class="server-indicator">
+        <div class="server-dot"></div>
+        <span>Node.js Server Mode</span>
+      </div>
       <div class="live-indicator" id="liveIndicator">
         <div class="live-dot"></div>
         <span class="live-text">LIVE</span>
@@ -35,10 +64,40 @@
   <main class="main" id="mainContent">
     <div class="loading">
       <div class="loading-spinner"></div>
-      <span id="loadingText">Loading token data...</span>
+      <span id="loadingText">Loading token data from server...</span>
     </div>
   </main>
 
+  <script>
+    const API_ENDPOINT = '/api/sessions';
+
+    async function loadTokenData() {
+      try {
+        const response = await fetch(API_ENDPOINT);
+        if (!response.ok) throw new Error('Failed to fetch data');
+        const data = await response.json();
+
+        // Update last updated time
+        const now = new Date();
+        document.getElementById('lastUpdated').textContent = now.toLocaleTimeString();
+
+        // Notify app.js
+        if (window.refreshDashboard) {
+          window.refreshDashboard({ sessions: data.sessions, summary: data.summary });
+        }
+      } catch (err) {
+        console.error('Error loading data:', err);
+        const el = document.getElementById('loadingText');
+        if (el) el.textContent = 'Error loading data from server';
+      }
+    }
+
+    // Expose hook so app.js can trigger a fetch on countdown
+    window.fetchData = loadTokenData;
+
+    // Initial load
+    loadTokenData();
+  </script>
   <script src="app.js"></script>
 </body>
 </html>

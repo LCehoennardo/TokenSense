@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" fill="none">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff6b6b"/>
+      <stop offset="100%" stop-color="#ffd93d"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Gauge/dashboard arc -->
+  <path d="M15 40 A 18 18 0 0 1 45 40" fill="none" stroke="#1e2730" stroke-width="4" stroke-linecap="round"/>
+  <path d="M15 40 A 18 18 0 0 1 38 26" fill="none" stroke="url(#grad1)" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Center dot -->
+  <circle cx="30" cy="40" r="3" fill="#ff6b6b"/>
+
+  <!-- Lightning bolt -->
+  <path d="M50 12L40 26h6l-4 14 14-18h-8l4-10z" fill="url(#grad1)"/>
+
+  <!-- Text -->
+  <text x="76" y="38" font-family="system-ui, sans-serif" font-size="28" font-weight="700" fill="#9ca3af">Token</text>
+  <text x="152" y="38" font-family="system-ui, sans-serif" font-size="28" font-weight="300" fill="#4ecdc4">Sense</text>
+</svg>

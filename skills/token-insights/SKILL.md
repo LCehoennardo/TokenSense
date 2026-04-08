@@ -1,6 +1,8 @@
 ---
 name: token-insights
-description: Generate a static HTML report analyzing your Claude Code token usage and costs
+description: |
+  Generate a static HTML dashboard analyzing Claude Code token usage and costs.
+  Use this skill whenever the user wants to check their token consumption, see how much they've spent on Claude API, analyze token usage patterns, view costs by model or project, or get a visual report of their Claude Code activity. Trigger when the user mentions "token usage", "how many tokens", "how much did I spend", "API cost", "Claude spending", "token breakdown", or asks about their Claude Code session history, spending trends, or resource consumption — even if they just say "check my usage" or "show me my token stats".
 ---
 
 # Token-Insights - Token Usage Report Generator
@@ -13,13 +15,25 @@ Parses all Claude Code session logs from `~/.claude/projects/` and generates a *
 - Daily usage trends (bar chart)
 - Top projects and models
 - Complete session history
+- Behavior analytics (permission modes, stop reasons, thinking turns)
+- Tool usage statistics (Read/Write/Edit/Bash, MCP tools, skills)
+
+## Installation
+
+Copy this `token-insights/` folder to `~/.claude/skills/` (or use in-place from this repo).
+
+```bash
+cp -r token-insights ~/.claude/skills/
+```
+
+Once installed, Claude will auto-trigger this skill when you ask about token usage, API costs, or Claude Code activity. You can also invoke it directly with `/token-insights`.
 
 ## How to use
 
 When invoked, this skill will:
-1. Run the `generate_report.py` script in this folder
-2. Generate a static HTML report saved to `output/token-insights-{timestamp}.html`
-3. Provide the file path to open in browser
+1. Parse all Claude Code session logs from `~/.claude/projects/`
+2. Generate a complete report directory in `output/token-insights-{timestamp}/`
+3. Provide the file path — open `index.html` in any browser to view
 
 ## Commands
 
@@ -32,25 +46,35 @@ python3 generate_report.py
 
 ```
 token-insights/
-├── SKILL.md           # This file
-├── generate_report.py # Report generator script
+├── SKILL.md                 # This file
+├── generate_report.py       # Report generator script
 ├── templates/
-│   └── report.html    # Static HTML template
+│   ├── dashboard.html       # Dashboard HTML template
+│   ├── style.css            # Dashboard styles
+│   ├── app.js               # Dashboard UI logic
+│   └── logo.svg             # Logo icon
 └── output/
-    └── *.html         # Generated reports
+    └── token-insights-{timestamp}/  # Generated reports
+        ├── index.html       # Dashboard entry point
+        ├── token_data.js    # Session data
+        ├── style.css        # Styles
+        ├── app.js           # UI logic
+        └── logo.svg         # Logo
 ```
 
 ## Output Format
 
-- Single static HTML file with all data embedded
-- No server required, no auto-refresh
-- Charts use Chart.js via CDN
-- Open directly in any modern browser
+The generated report is a **self-contained directory** with everything needed to view:
 
-## Key Differences from /insights
+- **Dashboard UI** with 4 tabs: Tokens, Costs, Behavior, Tools
+- **Interactive charts** via Chart.js (loaded from CDN)
+- **i18n support** — English/Chinese toggle
+- **Theme support** — dark/light mode
+- **No server required** — static files, open directly in browser
+- **No auto-refresh** — one-time snapshot
 
-| Aspect | Token-Insights | /insights |
-|--------|---------------|-----------|
-| Focus | Token usage & costs | Interaction patterns |
-| Analysis | Quantitative metrics | LLM-generated facets |
-| Output | Interactive charts | Narrative report |
+## Dependencies
+
+- Python 3.9+ (for `generate_report.py`)
+- Modern browser (for viewing reports)
+- Chart.js loaded from CDN at view time (requires internet for charts)

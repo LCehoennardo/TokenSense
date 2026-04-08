@@ -7,7 +7,8 @@
         refresh_in: 'Refresh in',
         loading: 'Loading token data...',
         error_load: 'Failed to load data',
-        error_make_sure: 'Make sure the server is running: node src/server.js',
+        error_cannot_load: 'Cannot load token_data.js',
+        error_make_sure: 'Make sure token_data.js exists and is accessible',
         tab_tokens: 'Tokens',
         tab_costs: 'Costs',
         tab_behavior: 'Behavior',
@@ -203,7 +204,8 @@
         refresh_in: '刷新倒计时',
         loading: '正在加载 Token 数据...',
         error_load: '加载数据失败',
-        error_make_sure: '请确保服务器正在运行：node src/server.js',
+        error_cannot_load: '无法加载 token_data.js',
+        error_make_sure: '请确保 token_data.js 存在且可访问',
         tab_tokens: 'Token用量',
         tab_costs: '成本',
         tab_behavior: '行为',
@@ -401,6 +403,7 @@
       return dict[key] || i18n.en[key] || key;
     }
 
+    const DATA_FILE = '../data/token_data.js';
     const REFRESH_INTERVAL = 60;
     const SESSIONS_PER_PAGE = 15;
     const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -603,20 +606,22 @@
     }
 
     function refreshData() {
-      // Static report mode (skill): data already loaded via script tag
+      // Static report mode: data already loaded via script tag
       if (window.IS_STATIC_REPORT) {
         loadData();
         return;
       }
-      // Server mode: trigger API fetch via token_visual.html's fetchData hook
-      if (window.fetchData) window.fetchData();
-    }
 
-    // Called by token_visual.html after each API response
-    window.refreshDashboard = function(data) {
-      window.TOKEN_DATA = data;
-      loadData();
-    };
+      const oldScript = document.getElementById('dataScript');
+      if (oldScript) oldScript.remove();
+
+      const script = document.createElement('script');
+      script.id = 'dataScript';
+      script.src = DATA_FILE + '?t=' + Date.now();
+      script.onload = loadData;
+      script.onerror = () => showError('Cannot load token_data.js');
+      document.body.appendChild(script);
+    }
 
     function getLevel(tokens, maxTokens) {
       if (tokens === 0) return 0;
@@ -2479,9 +2484,7 @@
     function init() {
       initTheme();
       initLang();
-      // Static mode: load data immediately (already in window.TOKEN_DATA)
-      // Server mode: wait for first API response via window.refreshDashboard
-      if (window.IS_STATIC_REPORT) refreshData();
+      refreshData();
       startAutoRefresh();
     }
 

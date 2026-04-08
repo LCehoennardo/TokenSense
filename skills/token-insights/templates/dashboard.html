@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Token-Insights Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .report-header {
+      max-width: 1400px;
+      margin: 0 auto 24px;
+      padding: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .report-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .report-meta {
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="report-header">
+    <h1>Token-Insights Report</h1>
+    <div class="report-meta">
+      Generated: <span id="generatedAt">--</span> | Static snapshot (no auto-refresh)
+    </div>
+  </div>
+
+  <header class="header">
+    <div class="logo">
+      <img class="logo-img" src="logo.svg" alt="TokenSense" width="180">
+    </div>
+    <div class="header-meta">
+      <div class="live-indicator">
+        <div class="live-dot"></div>
+        <span class="live-text">SNAPSHOT</span>
+      </div>
+      <div id="lastUpdated">--:--:--</div>
+      <div class="header-actions">
+        <button class="lang-toggle" id="langToggle" aria-label="Toggle language" title="Toggle language"></button>
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main" id="mainContent">
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      <span id="loadingText">Loading token data...</span>
+    </div>
+  </main>
+
+  <script src="token_data.js"></script>
+  <script>
+    // Mark as static report - skip dynamic data loading
+    window.IS_STATIC_REPORT = true;
+  </script>
+  <script src="app.js"></script>
+  <script>
+    // Set generated timestamp
+    const generatedAt = document.getElementById('generatedAt');
+    const lastUpdated = document.getElementById('lastUpdated');
+
+    if (window.TOKEN_DATA && window.TOKEN_DATA.summary) {
+      const sessions = window.TOKEN_DATA.sessions || [];
+      if (sessions.length > 0) {
+        const latestSession = sessions.reduce((latest, s) => {
+          const d = new Date(s.start_time);
+          return d > latest ? d : latest;
+        }, new Date(0));
+        generatedAt.textContent = latestSession.toLocaleString();
+        lastUpdated.textContent = latestSession.toLocaleTimeString();
+      }
+    }
+  </script>
+</body>
+</html>

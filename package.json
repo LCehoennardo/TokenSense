@@ -1,0 +1,22 @@
+{
+  "name": "tokensense",
+  "version": "1.0.0",
+  "description": "Claude Code token usage visualization dashboard",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "token",
+    "visualization",
+    "dashboard"
+  ],
+  "author": "jialianchen",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

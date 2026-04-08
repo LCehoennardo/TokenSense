@@ -4,34 +4,8 @@ data/
 # Local Claude settings
 .claude/
 
-# Python
+# Python cache
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-.venv/
-venv/
-ENV/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-*.egg
 
 # macOS
 .DS_Store
@@ -59,3 +33,4 @@ ENV/
 CLAUDE.md
 docs/prompt.md
 docs/TODO.md
+docs/problem.md
