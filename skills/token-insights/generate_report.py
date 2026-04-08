@@ -428,35 +428,44 @@ def compute_summary(sessions):
         daily_data[d]["est_cost"] += _session_cost(s)
 
     daily = [
-        {"date": d, **v, "total_tokens": v["input_tokens"] + v["output_tokens"], "est_cost": round(v["est_cost"], 4)}
+        {"date": d, **v, "total_tokens": v["input_tokens"] + v["output_tokens"] + v["cache_creation"] + v["cache_read"], "est_cost": round(v["est_cost"], 4)}
         for d, v in sorted(daily_data.items())
     ]
 
     # 按小时汇总（用于 hourly timeline 图表）
+    # 格式与 server.js 一致：24 个固定条目 "HH:00"
     hourly_data = defaultdict(lambda: {
         "input_tokens": 0, "output_tokens": 0,
-        "cache_creation": 0, "cache_read": 0, "sessions": 0, "duration": 0,
+        "cache_creation": 0, "cache_read": 0, "sessions": 0,
     })
     for s in sessions:
         dt = s.get("start_time")
-        if dt and s.get("date"):
+        if dt:
             try:
                 dt_obj = datetime.fromisoformat(dt.replace("Z", "+00:00"))
                 local_dt = dt_obj.astimezone()
-                hour_key = f"{s['date']} {local_dt.hour:02d}:00"
+                hour_key = f"{local_dt.hour:02d}:00"
                 hourly_data[hour_key]["input_tokens"] += s["input_tokens"]
                 hourly_data[hour_key]["output_tokens"] += s["output_tokens"]
                 hourly_data[hour_key]["cache_creation"] += s["cache_creation_input_tokens"]
                 hourly_data[hour_key]["cache_read"] += s["cache_read_input_tokens"]
                 hourly_data[hour_key]["sessions"] += 1
-                hourly_data[hour_key]["duration"] += s["duration_minutes"]
             except Exception:
                 pass
 
-    hourly_timeline = [
-        {"hour": h, **v, "total_tokens": v["input_tokens"] + v["output_tokens"]}
-        for h, v in sorted(hourly_data.items())
-    ]
+    hourly_timeline = []
+    for i in range(24):
+        key = f"{i:02d}:00"
+        v = hourly_data.get(key, {"input_tokens": 0, "output_tokens": 0, "cache_creation": 0, "cache_read": 0, "sessions": 0})
+        hourly_timeline.append({
+            "hour": key,
+            "input_tokens": v["input_tokens"],
+            "output_tokens": v["output_tokens"],
+            "cache_creation": v["cache_creation"],
+            "cache_read": v["cache_read"],
+            "total_tokens": v["input_tokens"] + v["output_tokens"] + v["cache_creation"] + v["cache_read"],
+            "sessions": v["sessions"],
+        })
 
     # 按项目汇总
     project_data = defaultdict(lambda: {
@@ -484,7 +493,7 @@ def compute_summary(sessions):
             "output_tokens": v["output_tokens"],
             "cache_creation": v["cache_creation"],
             "cache_read": v["cache_read"],
-            "total_tokens": v["input_tokens"] + v["output_tokens"],
+            "total_tokens": v["input_tokens"] + v["output_tokens"] + v["cache_creation"] + v["cache_read"],
             "sessions": v["sessions"],
             "est_cost": round(v["est_cost"], 2),
         })
