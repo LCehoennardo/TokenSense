@@ -75,6 +75,17 @@ const server = http.createServer((req, res) => {
     filePath = path.join(__dirname, '..', url.pathname);
   }
 
+  // Path traversal prevention: ensure resolved path is within allowed directory
+  const resolved = path.resolve(filePath);
+  const allowedBase = url.pathname.startsWith('/docs/')
+    ? path.resolve(__dirname, '..')
+    : path.resolve(__dirname);
+  if (!resolved.startsWith(allowedBase + path.sep) && resolved !== allowedBase) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
+  }
+
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
@@ -158,6 +169,9 @@ async function getSessions() {
 
     return { sessions, summary: computeSummary(sessions) };
   } catch (err) {
+    if (err.code === 'ENOENT') {
+      return { sessions: [], summary: computeSummary([]) };
+    }
     throw err;
   }
 }
@@ -177,6 +191,7 @@ async function parseSessionFile(filePath, projectName) {
 
   // Behavior and tools data
   const toolCalls = [];
+  const toolChain = []; // ordered list of tool names
   const toolResults = {};
   let thinkingTurns = 0;
   let userMessages = 0;
@@ -186,6 +201,12 @@ async function parseSessionFile(filePath, projectName) {
   const permissionModes = {};
   const mcpToolsCounter = {};
   const skillCallsCounter = {};
+
+  // Stability and duration data
+  const turnDurations = [];
+  let apiErrorCount = 0;
+  let maxRetryAttempt = 0;
+  let compactCount = 0;
 
   try {
     const content = await fs.promises.readFile(filePath, 'utf-8');
@@ -212,6 +233,20 @@ async function parseSessionFile(filePath, projectName) {
         // Permission mode
         if (data.permissionMode) {
           permissionModes[data.permissionMode] = (permissionModes[data.permissionMode] || 0) + 1;
+        }
+
+        // System records: turn_duration, api_error, compact_boundary
+        if (recordType === 'system') {
+          const sub = data.subtype || '';
+          if (sub === 'turn_duration') {
+            const ms = data.durationMs || 0;
+            if (ms > 0) turnDurations.push(ms);
+          } else if (sub === 'api_error') {
+            apiErrorCount++;
+            maxRetryAttempt = Math.max(maxRetryAttempt, data.retryAttempt || 0);
+          } else if (sub === 'compact_boundary') {
+            compactCount++;
+          }
         }
 
         // User messages
@@ -284,6 +319,7 @@ async function parseSessionFile(filePath, projectName) {
                   }
 
                   toolCalls.push(toolCall);
+                  toolChain.push(toolName);
 
                   // MCP tools
                   if (toolName.startsWith('mcp__')) {
@@ -390,6 +426,19 @@ async function parseSessionFile(filePath, projectName) {
     unique_files: Object.keys(fileOperations).length,
     // Cost (computed after models are known)
     est_cost: null, // filled below
+    // Turn duration
+    turn_count: turnDurations.length,
+    avg_turn_ms: turnDurations.length > 0 ? Math.floor(turnDurations.reduce((a,b) => a+b, 0) / turnDurations.length) : 0,
+    total_turn_ms: turnDurations.reduce((a,b) => a+b, 0),
+    max_turn_ms: turnDurations.length > 0 ? Math.max(...turnDurations) : 0,
+    // Stability
+    api_errors: apiErrorCount,
+    max_retry: maxRetryAttempt,
+    compact_events: compactCount,
+    // Agentic
+    agentic_ratio: stopReasons['tool_use'] ? stopReasons['tool_use'] / Math.max(1, Object.values(stopReasons).reduce((a,b) => a+b, 0)) : 0,
+    // Tool chain
+    tool_chain: toolChain,
   };
 }
 
@@ -411,6 +460,14 @@ function normalizeProjectName(dirName) {
 
   baseName = baseName.replace(/-+/g, '-').replace(/^-+|-+$/g, '');
   return baseName || 'Unknown';
+}
+
+function getISOWeekNumber(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 }
 
 function computeSummary(sessions) {
@@ -571,12 +628,12 @@ function computeSummary(sessions) {
   const skill_summary = {
     total_calls: skillTotal,
     unique_skills: Object.keys(skillMap).length,
-    ranking: Object.entries(skillMap).sort(([, a], [, b]) => b - a).map(([name, count]) => ({ name, count })),
+    ranking: Object.entries(skillMap).sort(([, a], [, b]) => b - a).map(([skill, count]) => ({ skill, count })),
     by_project: Object.entries(skillByProject)
       .map(([project, skills]) => ({
         project,
         total: Object.values(skills).reduce((a, b) => a + b, 0),
-        skills: Object.entries(skills).sort(([, a], [, b]) => b - a).map(([name, count]) => ({ name, count })),
+        skills: Object.entries(skills).sort(([, a], [, b]) => b - a).map(([skill, count]) => ({ skill, count })),
       }))
       .sort((a, b) => b.total - a.total),
   };
@@ -592,13 +649,33 @@ function computeSummary(sessions) {
     .sort(([, a], [, b]) => b - a)
     .map(([mode, count]) => ({ mode, count }));
 
-  // Thinking stats
+  // ── 工具链路统计 ──────────────────────────────────────────────────
+  const chainPatterns = {};
+  for (const s of sessions) {
+    const chain = s.tool_chain || [];
+    for (let i = 0; i < chain.length - 1; i++) {
+      const pattern = `${chain[i]} → ${chain[i+1]}`;
+      chainPatterns[pattern] = (chainPatterns[pattern] || 0) + 1;
+    }
+  }
+  const tool_chains = Object.entries(chainPatterns)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 20)
+    .map(([pattern, count]) => ({ pattern, count }));
+
+  // ── Thinking 统计 ─────────────────────────────────────────────────
   const sessionsWithThinking = sessions.filter(s => s.has_thinking);
   const thinkingByProject = {};
+  const tBuckets = { "1to10": 0, "11to50": 0, "51to200": 0, "gt200": 0 };
   for (const s of sessions) {
     if (s.thinking_turns > 0) {
       if (!thinkingByProject[s.project]) thinkingByProject[s.project] = 0;
       thinkingByProject[s.project] += s.thinking_turns;
+      const t = s.thinking_turns;
+      if (t <= 10) tBuckets["1to10"]++;
+      else if (t <= 50) tBuckets["11to50"]++;
+      else if (t <= 200) tBuckets["51to200"]++;
+      else tBuckets["gt200"]++;
     }
   }
   const thinking_stats = {
@@ -607,8 +684,114 @@ function computeSummary(sessions) {
     total_turns: sessions.reduce((a, s) => a + (s.thinking_turns || 0), 0),
     by_project: Object.entries(thinkingByProject)
       .sort(([, a], [, b]) => b - a)
-      .map(([project, turns]) => ({ project, turns })),
+      .map(([project, turns]) => ({ project, turns }))
+      .slice(0, 10),
+    buckets: tBuckets,
   };
+
+  // ── Agentic 统计 ──────────────────────────────────────────────────
+  const agenticVals = [];
+  for (const s of sessions) {
+    const sr = s.stop_reasons || {};
+    const tsr = Object.values(sr).reduce((a,b) => a+b, 0) || 1;
+    const ratio = (sr['tool_use'] || 0) / tsr;
+    if (ratio > 0) agenticVals.push(ratio);
+  }
+  const agentic_stats = {
+    avg_ratio: agenticVals.length > 0 ? Math.round(agenticVals.reduce((a,b) => a+b, 0) / agenticVals.length * 1000) / 1000 : 0,
+    highly_agentic_count: agenticVals.filter(v => v > 0.9).length,
+  };
+
+  // ── 权限按周聚合 (autonomy_trend) ─────────────────────────────────
+  const weekPermission = {};
+  for (const s of sessions) {
+    if (!s.date) continue;
+    const dt = new Date(s.date + 'T00:00:00');
+    if (isNaN(dt.getTime())) continue;
+    // ISO week: get Thursday of the week
+    const dayOfWeek = dt.getDay();
+    const thu = new Date(dt);
+    thu.setDate(dt.getDate() + (4 - dayOfWeek + 7) % 7);
+    const weekNum = getISOWeekNumber(thu);
+    const wk = `${thu.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+    if (!weekPermission[wk]) weekPermission[wk] = {};
+    for (const [mode, cnt] of Object.entries(s.permission_modes || {})) {
+      weekPermission[wk][mode] = (weekPermission[wk][mode] || 0) + cnt;
+    }
+  }
+  const autonomy_trend = Object.entries(weekPermission)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([wk, wc]) => ({
+      week: wk,
+      default: wc.default || 0,
+      acceptEdits: wc.acceptEdits || 0,
+      bypassPermissions: wc.bypassPermissions || 0,
+      plan: wc.plan || 0,
+      total: Object.values(wc).reduce((a,b) => a+b, 0) || 1,
+    }));
+
+  // ── 稳定性 ────────────────────────────────────────────────────────
+  const totalApiErrors = sessions.reduce((a, s) => a + (s.api_errors || 0), 0);
+  const totalCompact = sessions.reduce((a, s) => a + (s.compact_events || 0), 0);
+  const sessionsWithErrors = sessions.filter(s => s.api_errors > 0).length;
+  const maxRetry = Math.max(0, ...sessions.map(s => s.max_retry || 0));
+  const compactByProject = {};
+  for (const s of sessions) {
+    if (s.compact_events > 0) {
+      compactByProject[s.project] = (compactByProject[s.project] || 0) + s.compact_events;
+    }
+  }
+  const topCompact = Object.entries(compactByProject)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([project, count]) => ({ project, count }));
+  const stability = {
+    total_api_errors: totalApiErrors,
+    total_compact_events: totalCompact,
+    sessions_with_errors: sessionsWithErrors,
+    max_retry_seen: maxRetry,
+    top_compact_projects: topCompact,
+  };
+
+  // ── Turn duration 统计 ────────────────────────────────────────────
+  const allAvgMs = sessions.filter(s => s.avg_turn_ms > 0).map(s => s.avg_turn_ms);
+  let turn_duration_stats;
+  if (allAvgMs.length > 0) {
+    const sorted = [...allAvgMs].sort((a,b) => a-b);
+    const n = sorted.length;
+    const buckets = { "lt1m": 0, "1to5m": 0, "5to15m": 0, "gt15m": 0 };
+    for (const ms of allAvgMs) {
+      const sVal = ms / 1000;
+      if (sVal < 60) buckets["lt1m"]++;
+      else if (sVal < 300) buckets["1to5m"]++;
+      else if (sVal < 900) buckets["5to15m"]++;
+      else buckets["gt15m"]++;
+    }
+    const totalHours = sessions.reduce((a, s) => a + (s.total_turn_ms || 0), 0) / 3_600_000;
+    const slowest = sessions
+      .filter(s => s.avg_turn_ms > 0)
+      .sort((a,b) => b.avg_turn_ms - a.avg_turn_ms)
+      .slice(0, 5);
+    turn_duration_stats = {
+      count: n,
+      avg_ms: Math.floor(allAvgMs.reduce((a,b) => a+b, 0) / n),
+      p50_ms: sorted[Math.floor(n/2)],
+      p90_ms: sorted[Math.floor(n*0.9)],
+      max_ms: Math.max(...allAvgMs),
+      total_hours: Math.round(totalHours * 100) / 100,
+      buckets,
+      slowest_sessions: slowest.map(s => ({
+        id: s.id, project: s.project, date: s.date, avg_turn_ms: s.avg_turn_ms,
+      })),
+    };
+  } else {
+    turn_duration_stats = {
+      count: 0, avg_ms: 0, p50_ms: 0, p90_ms: 0,
+      max_ms: 0, total_hours: 0,
+      buckets: { "lt1m": 0, "1to5m": 0, "5to15m": 0, "gt15m": 0 },
+      slowest_sessions: [],
+    };
+  }
 
   // Hourly and weekday distributions (local time)
   const hourly = Array(24).fill(0);
@@ -619,9 +802,10 @@ function computeSummary(sessions) {
     const dt = new Date(s.start_time);
     const h = dt.getHours();
     const w = dt.getDay();
+    const weekdayIdx = w === 0 ? 6 : w - 1; // Convert 0=Sunday to 0=Monday
     hourly[h] += s.total_tokens;
-    weekday[w] += s.total_tokens;
-    hour_weekday_matrix[w][h] += s.total_tokens;
+    weekday[weekdayIdx] += s.total_tokens;
+    hour_weekday_matrix[weekdayIdx][h] += s.total_tokens;
 
     const hKey = `${String(h).padStart(2, '0')}:00`;
     if (!hourlyTimelineMap[hKey]) hourlyTimelineMap[hKey] = { input: 0, output: 0, cc: 0, cr: 0, sessions: 0 };
@@ -677,12 +861,12 @@ function computeSummary(sessions) {
     costByProject[s.project] += s.est_cost || 0;
   }
   const cost_real = {
-    total: totalCost,
-    max_session: Math.max(...sessions.map(s => s.est_cost || 0)),
+    total: Math.round(totalCost * 100) / 100,
+    max_session: Math.round(Math.max(...sessions.map(s => s.est_cost || 0)) * 100) / 100,
     session_count: sessions.length,
     by_project: Object.entries(costByProject)
       .sort(([, a], [, b]) => b - a)
-      .map(([project, cost]) => ({ project, cost })),
+      .map(([project, cost]) => ({ project, cost: Math.round(cost * 100) / 100 })),
   };
 
   return {
@@ -694,17 +878,17 @@ function computeSummary(sessions) {
     total_sessions: sessions.length,
     total_cost: totalCost,
     daily, projects, models,
-    tools, files, bash_commands, tool_chains: [],
+    tools, files, bash_commands, tool_chains,
     hourly_timeline, hourly, weekday, hour_weekday_matrix, peak_hour,
     thinking_stats,
-    stability: { total_api_errors: 0, total_compact_events: 0, sessions_with_errors: 0 },
+    stability,
     permission_summary,
-    agentic_stats: {},
+    agentic_stats,
     streak: { current: currentStreak, max: maxStreak, active_days: activeDates.size },
     mcp_summary, skill_summary,
     cost_real,
-    autonomy_trend: [], version_timeline: [],
-    turn_duration_stats: {},
+    autonomy_trend, version_timeline: [],
+    turn_duration_stats,
   };
 }
 

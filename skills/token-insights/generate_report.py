@@ -17,6 +17,7 @@ from collections import defaultdict, Counter
 MODEL_PRICING = {
     "claude-opus-4-5":   {"input": 15.00, "output": 75.00, "cw": 18.75, "cr": 1.50},
     "claude-opus-4":     {"input": 15.00, "output": 75.00, "cw": 18.75, "cr": 1.50},
+    "claude-sonnet-4-6": {"input":  3.00, "output": 15.00, "cw":  3.75, "cr": 0.30},
     "claude-sonnet-4-5": {"input":  3.00, "output": 15.00, "cw":  3.75, "cr": 0.30},
     "claude-sonnet-4":   {"input":  3.00, "output": 15.00, "cw":  3.75, "cr": 0.30},
     "claude-haiku-4-5":  {"input":  0.80, "output":  4.00, "cw":  1.00, "cr": 0.08},
@@ -36,7 +37,7 @@ def normalize_project_name(dir_name):
         return "Unknown"
 
     # 移除 (subagent) 后缀
-    base_name = dir_name.replace(" (subagent)", "").replace(" (subagent)", "")
+    base_name = dir_name.replace(" (subagent)", "")
 
     # 处理 Claude Code 格式：-Users-username-machine-projectname
     if base_name.startswith("-Users-"):
@@ -297,7 +298,7 @@ def parse_session_file(jsonl_path, project_name):
         "output_tokens": usage_total["output_tokens"],
         "cache_creation_input_tokens": usage_total["cache_creation_input_tokens"],
         "cache_read_input_tokens": usage_total["cache_read_input_tokens"],
-        "total_tokens": usage_total["input_tokens"] + usage_total["output_tokens"],
+        "total_tokens": usage_total["input_tokens"] + usage_total["output_tokens"] + usage_total["cache_creation_input_tokens"] + usage_total["cache_read_input_tokens"],
         "models": list(models),
         "model_str": ", ".join(sorted(models))[:30],
         "start_time": first_timestamp.isoformat(),
@@ -409,7 +410,7 @@ def compute_summary(sessions):
     total_output = sum(s["output_tokens"] for s in sessions)
     total_cache_creation = sum(s["cache_creation_input_tokens"] for s in sessions)
     total_cache_read = sum(s["cache_read_input_tokens"] for s in sessions)
-    total_tokens = total_input + total_output
+    total_tokens = total_input + total_output + total_cache_creation + total_cache_read
     total_cost = sum(_session_cost(s) for s in sessions)
 
     # 按日期汇总
@@ -543,7 +544,7 @@ def compute_summary(sessions):
     files = []
     for fp, v in sorted(file_totals.items(), key=lambda x: x[1]["reads"]+x[1]["writes"]+x[1]["edits"], reverse=True)[:30]:
         to = v["reads"] + v["writes"] + v["edits"]
-        files.append({"file": fp, "reads": v["reads"], "writes": v["writes"], "edits": v["edits"], "total_ops": to, "projects": len(v["projects"])})
+        files.append({"file": fp, "reads": v["reads"], "writes": v["writes"], "edits": v["edits"], "total_ops": to, "projects": list(v["projects"])})
 
     # ── Bash 命令统计 ─────────────────────────────────────────────────
     bash_summary = defaultdict(lambda: {"count": 0, "errors": 0})

@@ -1435,6 +1435,7 @@
     .h-bar-fill.mcp   { background: linear-gradient(90deg, var(--accent-cool), #67e8f9); }
     .h-bar-fill.skill { background: linear-gradient(90deg, var(--accent-gold), #fbbf24); }
     .h-bar-fill.time  { background: linear-gradient(90deg, var(--accent-hot), #fb923c); }
+    .h-bar-fill.cool  { background: linear-gradient(90deg, var(--accent-cool), #67e8f9); }
     .h-bar-fill.perm-bypass { background: var(--accent-hot); }
     .h-bar-fill.perm-accept { background: var(--accent-cool); }
     .h-bar-fill.perm-default { background: var(--text-muted); }
