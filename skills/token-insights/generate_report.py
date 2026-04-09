@@ -349,6 +349,9 @@ def parse_all_sessions():
     """解析所有会话文件（不使用缓存，每次重新生成）。"""
     sessions = []
 
+    if not PROJECTS_DIR.exists():
+        return sessions
+
     for project_dir in PROJECTS_DIR.iterdir():
         if not project_dir.is_dir():
             continue
@@ -481,7 +484,7 @@ def compute_summary(sessions):
         project_data[p]["sessions"] += 1
         project_data[p]["est_cost"] += _session_cost(s)
 
-    sorted_projects = sorted(project_data.items(), key=lambda x: x[1]["input_tokens"], reverse=True)
+    sorted_projects = sorted(project_data.items(), key=lambda x: x[1]["input_tokens"] + x[1]["output_tokens"] + x[1]["cache_creation"] + x[1]["cache_read"], reverse=True)
     top_projects = sorted_projects[:20]
     other_projects = sorted_projects[20:]
 
@@ -508,7 +511,7 @@ def compute_summary(sessions):
             other["cache_read"] += v["cache_read"]
             other["sessions"] += v["sessions"]
             other["est_cost"] += v["est_cost"]
-        other["total_tokens"] = other["input_tokens"] + other["output_tokens"]
+        other["total_tokens"] = other["input_tokens"] + other["output_tokens"] + other["cache_creation"] + other["cache_read"]
         other["est_cost"] = round(other["est_cost"], 2)
         project_list.append(other)
 
@@ -539,7 +542,7 @@ def compute_summary(sessions):
     tools = []
     for name, v in sorted(tool_totals.items(), key=lambda x: x[1]["count"], reverse=True):
         sr = round((v["count"] - v["errors"]) / max(1, v["count"]) * 100, 1)
-        tools.append({"name": name, "count": v["count"], "errors": v["errors"], "rejected": 0, "success_rate": sr})
+        tools.append({"name": name, "count": v["count"], "errors": v["errors"], "rejected": 0, "success_rate": str(sr)})
 
     # ── 文件操作统计 ──────────────────────────────────────────────────
     file_totals = defaultdict(lambda: {"reads": 0, "writes": 0, "edits": 0, "projects": set()})
@@ -654,9 +657,10 @@ def compute_summary(sessions):
         try:
             dt = datetime.fromisoformat(s["start_time"].replace("Z", "+00:00")).astimezone()
             h, w = dt.hour, dt.weekday()
-            if 0 <= h < 24: hourly[h] += 1
-            if 0 <= w < 7: weekday_counts[w] += 1
-            if 0 <= w < 7 and 0 <= h < 24: hour_weekday_matrix[w][h] += 1
+            total_tk = s.get("total_tokens", 0)
+            if 0 <= h < 24: hourly[h] += total_tk
+            if 0 <= w < 7: weekday_counts[w] += total_tk
+            if 0 <= w < 7 and 0 <= h < 24: hour_weekday_matrix[w][h] += total_tk
         except (ValueError, KeyError): pass
     peak_hour = hourly.index(max(hourly)) if any(hourly) else 0
 
