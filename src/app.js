@@ -674,7 +674,7 @@
           ${tabNav}
           <div class="content-left">
             ${renderHero(summary)}
-            ${renderChart(summary.daily, summary.hourly_timeline || [])}
+            ${renderChart(summary.daily)}
             ${renderHeatmap(summary.daily)}
             ${renderSessionsTable(sessions)}
           </div>
@@ -685,7 +685,7 @@
           </div>
         `;
 
-        initChart(summary.daily, summary.hourly_timeline || []);
+        initChart(summary.daily);
       } else if (state.activeTab === 'costs') {
         main.innerHTML = `
           ${tabNav}
@@ -845,7 +845,7 @@
       `;
     }
 
-    function renderChart(daily, hourly) {
+    function renderChart(daily) {
       const rangeStart = state.dateRangeStart || '';
       const rangeEnd = state.dateRangeEnd || '';
       const mode = state.chartMode;
@@ -855,26 +855,33 @@
         const dates = daily.map(d => d.date).sort();
         minDate = dates[0];
         maxDate = dates[dates.length - 1];
-      } else if (hourly && hourly.length > 0 && hourly[0].hour) {
-        // hourly_timeline uses "HH:00" format, not dates — extract dates from hour strings that look like dates
-        const dateEntries = hourly.filter(h => h.hour && h.hour.includes('-')).map(h => h.hour.slice(0, 10));
-        const uniqueDates = [...new Set(dateEntries)].sort();
-        if (uniqueDates.length > 0) {
-          minDate = uniqueDates[0];
-          maxDate = uniqueDates[uniqueDates.length - 1];
+      }
+
+      let selectedDate = rangeStart;
+      if (!selectedDate && maxDate) selectedDate = maxDate;
+
+      const countLabel = mode === 'hourly' ? '24 hours' : daily.length + ' ' + t('days_badge');
+
+      let datePickerHTML;
+      if (mode === 'hourly') {
+        datePickerHTML = `
+          <input type="date" id="dateStart" class="date-picker" value="${selectedDate}" min="${minDate}" max="${maxDate}">
+        `;
+      } else {
+        let startDate = rangeStart;
+        let endDate = rangeEnd;
+        if (!startDate && !endDate && maxDate) {
+          endDate = maxDate;
+          const d = new Date(maxDate);
+          d.setDate(d.getDate() - 6);
+          startDate = d.toISOString().slice(0, 10);
         }
+        datePickerHTML = `
+          <input type="date" id="dateStart" class="date-picker" value="${startDate}" min="${minDate}" max="${maxDate}">
+          <span class="date-separator">—</span>
+          <input type="date" id="dateEnd" class="date-picker" value="${endDate}" min="${minDate}" max="${maxDate}">
+        `;
       }
-
-      let startDate = rangeStart;
-      let endDate = rangeEnd;
-      if (!startDate && !endDate && maxDate) {
-        endDate = maxDate;
-        const d = new Date(maxDate);
-        d.setDate(d.getDate() - 6);
-        startDate = d.toISOString().slice(0, 10);
-      }
-
-      const countLabel = mode === 'hourly' ? (hourly ? hourly.length : 0) + ' hours' : daily.length + ' ' + t('days_badge');
 
       return `
         <div class="section">
@@ -882,9 +889,7 @@
             <div class="section-title">${t('daily_usage')}</div>
             <div class="chart-controls">
               <div class="date-range-picker">
-                <input type="date" id="dateStart" class="date-picker" value="${startDate}" min="${minDate}" max="${maxDate}">
-                <span class="date-separator">—</span>
-                <input type="date" id="dateEnd" class="date-picker" value="${endDate}" min="${minDate}" max="${maxDate}">
+                ${datePickerHTML}
               </div>
               <button class="chart-mode-btn ${mode === 'daily' ? 'active' : ''}" data-mode="daily">${t('daily_btn') || '日'}</button>
               <button class="chart-mode-btn ${mode === 'hourly' ? 'active' : ''}" data-mode="hourly">${t('hourly_btn') || '时'}</button>
@@ -898,38 +903,64 @@
       `;
     }
 
-    function initChart(daily, hourly) {
+    function computeHourlyForDate(sessions, date) {
+      const filtered = sessions.filter(s => s.date === date);
+
+      const buckets = Array.from({ length: 24 }, () => ({
+        input_tokens: 0, output_tokens: 0,
+        cache_creation: 0, cache_read: 0,
+        total_tokens: 0, sessions: 0
+      }));
+
+      for (const s of filtered) {
+        const h = parseHour(s.time || '00:00');
+        buckets[h].input_tokens += s.input_tokens || 0;
+        buckets[h].output_tokens += s.output_tokens || 0;
+        buckets[h].cache_creation += s.cache_creation_input_tokens || 0;
+        buckets[h].cache_read += s.cache_read_input_tokens || 0;
+        buckets[h].total_tokens += s.total_tokens || 0;
+        buckets[h].sessions += 1;
+      }
+
+      return buckets.map((b, i) => ({
+        hour: `${String(i).padStart(2, '0')}:00`,
+        ...b
+      }));
+    }
+
+    function parseHour(timeStr) {
+      // Handles "HH:MM AM/PM" (e.g. "03:58 PM") and "HH:MM" (24-hour) formats
+      const parts = timeStr.trim().split(/\s+/);
+      const [hh] = parts[0].split(':');
+      let h = parseInt(hh, 10) || 0;
+      const period = parts.length > 1 ? parts[1].toUpperCase() : '';
+      if (period === 'PM' && h < 12) h += 12;
+      if (period === 'AM' && h === 12) h = 0;
+      return h;
+    }
+
+    function initChart(daily) {
       const ctx = document.getElementById('dailyChart');
       if (!ctx) return;
 
-      let chartData = daily;
-      let isHourly = false;
+      const isHourly = state.chartMode === 'hourly';
 
-      if (state.chartMode === 'hourly' && hourly && hourly.length > 0) {
-        chartData = hourly;
-        isHourly = true;
-      }
-
-      const startDate = state.dateRangeStart;
-      const endDate = state.dateRangeEnd;
-
-      if (startDate || endDate) {
-        chartData = chartData.filter(d => {
-          if (isHourly) {
-            // hourly_timeline is aggregated across all days (24 entries: "00:00"-"23:00")
-            // Don't filter by date — just show all hours
-            return true;
-          }
-          const dateStr = d.date;
-          if (startDate && dateStr < startDate) return false;
-          if (endDate && dateStr > endDate) return false;
-          return true;
-        });
-      }
-
+      let chartData;
       if (isHourly) {
-        chartData.sort((a, b) => a.hour.localeCompare(b.hour));
+        const selectedDate = state.dateRangeStart || '';
+        chartData = computeHourlyForDate(state.sessions, selectedDate);
       } else {
+        const startDate = state.dateRangeStart;
+        const endDate = state.dateRangeEnd;
+        chartData = daily;
+        if (startDate || endDate) {
+          chartData = chartData.filter(d => {
+            const dateStr = d.date;
+            if (startDate && dateStr < startDate) return false;
+            if (endDate && dateStr > endDate) return false;
+            return true;
+          });
+        }
         chartData.sort((a, b) => a.date.localeCompare(b.date));
       }
 
