@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * TokenSense - Lightweight Server
+ * TokenSense - Lightweight Server with Caching
  * Pure frontend token visualization without Python dependencies
+ *
+ * Caching:
+ * - Session cache keyed by file path + mtime (incremental parsing)
+ * - Summary cache invalidated only when session data changes
+ * - Persisted to data/node_cache.json for server restart resilience
  */
 
 const http = require('http');
@@ -39,6 +44,8 @@ function calcCost(s, pricing) {
 
 const PORT = 3000;
 const PROJECTS_DIR = path.join(require('os').homedir(), '.claude', 'projects');
+const CACHE_DIR = path.join(__dirname, '..', 'data');
+const CACHE_FILE = path.join(CACHE_DIR, 'node_cache.json');
 
 // MIME types
 const MIME_TYPES = {
@@ -50,6 +57,268 @@ const MIME_TYPES = {
   '.png': 'image/png',
 };
 
+// ─── Caching Layer ─────────────────────────────────────────────────────
+// Session cache: per-file metadata keyed by absolute file path.
+// Each entry tracks mtime and the session IDs produced from that file.
+// Sessions themselves are stored in a flat map keyed by session ID.
+
+const sessionCache = {
+  fileMeta: {},   // { filePath: { mtimeMs, sessionIds: [...], project } }
+  sessions: {},   // { sessionId: { ...sessionObject } }
+  summary: null,  // cached computeSummary result (null = needs recompute)
+};
+
+// Preload synchronization: first API request waits for preload to finish
+// instead of triggering a redundant full parse.
+let preloadPromise = null;
+let preloadReady = false;
+
+/**
+ * Save in-memory cache to disk. Non-blocking — fire-and-forget.
+ */
+function persistCache() {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    const payload = JSON.stringify({
+      fileMeta: sessionCache.fileMeta,
+      sessions: sessionCache.sessions,
+    });
+    fs.writeFileSync(CACHE_FILE, payload, 'utf-8');
+  } catch (e) {
+    // Disk write failure is non-fatal; cache lives in memory.
+  }
+}
+
+/**
+ * Load cache from disk into memory. Returns true if loaded successfully.
+ */
+function loadCache() {
+  try {
+    if (!fs.existsSync(CACHE_FILE)) return false;
+    const raw = fs.readFileSync(CACHE_FILE, 'utf-8');
+    const data = JSON.parse(raw);
+    if (data.fileMeta) sessionCache.fileMeta = data.fileMeta;
+    if (data.sessions) sessionCache.sessions = data.sessions;
+    return Object.keys(sessionCache.fileMeta).length > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Scan all project directories and collect file paths with mtimes.
+ * Returns Array<{ filePath, mtimeMs, project }>.
+ */
+async function scanSessionFiles() {
+  const files = [];
+
+  try {
+    const projectDirs = await fs.promises.readdir(PROJECTS_DIR, { withFileTypes: true });
+
+    for (const projectEntry of projectDirs) {
+      if (!projectEntry.isDirectory()) continue;
+
+      const projectName = normalizeProjectName(projectEntry.name);
+      const projectPath = path.join(PROJECTS_DIR, projectEntry.name);
+
+      let projectFiles;
+      try {
+        projectFiles = await fs.promises.readdir(projectPath);
+      } catch {
+        continue;
+      }
+
+      for (const file of projectFiles) {
+        if (!file.endsWith('.jsonl')) continue;
+        const filePath = path.join(projectPath, file);
+        try {
+          const stat = await fs.promises.stat(filePath);
+          files.push({ filePath, mtimeMs: stat.mtimeMs, project: projectName });
+        } catch {
+          // File may have been deleted between readdir and stat
+        }
+      }
+
+      // Scan subagent session files
+      for (const file of projectFiles) {
+        if (!file.endsWith('.jsonl')) continue;
+
+        const sessionId = path.basename(file, '.jsonl');
+        const subagentsDir = path.join(projectPath, sessionId, 'subagents');
+
+        try {
+          const subagentFiles = await fs.promises.readdir(subagentsDir);
+          for (const subFile of subagentFiles) {
+            if (subFile.endsWith('.meta.json')) continue;
+            if (!subFile.endsWith('.jsonl')) continue;
+
+            const subPath = path.join(subagentsDir, subFile);
+            try {
+              const stat = await fs.promises.stat(subPath);
+              files.push({ filePath: subPath, mtimeMs: stat.mtimeMs, project: `${projectName} (subagent)` });
+            } catch {
+              // File deleted between readdir and stat
+            }
+          }
+        } catch {
+          // No subagents directory
+        }
+      }
+    }
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw err;
+  }
+
+  return files;
+}
+
+/**
+ * Parse sessions from files that are new or have changed (mtime mismatch).
+ * Returns updated session cache. This is the incremental update step.
+ */
+async function updateCache(fileList) {
+  const currentPaths = new Set(fileList.map(f => f.filePath));
+  let changed = false;
+
+  // Remove entries for files that no longer exist
+  for (const filePath of Object.keys(sessionCache.fileMeta)) {
+    if (!currentPaths.has(filePath)) {
+      const meta = sessionCache.fileMeta[filePath];
+      // Delete sessions from this file
+      for (const sid of meta.sessionIds) {
+        delete sessionCache.sessions[sid];
+      }
+      delete sessionCache.fileMeta[filePath];
+      changed = true;
+    }
+  }
+
+  // Parse new or modified files
+  for (const { filePath, mtimeMs, project } of fileList) {
+    const cachedMeta = sessionCache.fileMeta[filePath];
+
+    // Cache hit: mtime unchanged, use cached sessions
+    if (cachedMeta && cachedMeta.mtimeMs === mtimeMs) {
+      continue;
+    }
+
+    // Cache miss or stale: re-parse
+    const oldSessionIds = cachedMeta ? cachedMeta.sessionIds : [];
+
+    // Delete old sessions for this file
+    for (const sid of oldSessionIds) {
+      delete sessionCache.sessions[sid];
+    }
+
+    const sessionData = await parseSessionFile(filePath, project);
+    if (sessionData) {
+      sessionData.project = normalizeProjectName(sessionData.project);
+
+      // Compute cost
+      const pricing = getPricing(sessionData.model_str);
+      sessionData.est_cost = calcCost(sessionData, pricing);
+
+      const sessionId = sessionData.id;
+      sessionCache.sessions[sessionId] = sessionData;
+      sessionCache.fileMeta[filePath] = {
+        mtimeMs,
+        sessionIds: [sessionId],
+        project,
+      };
+    } else {
+      sessionCache.fileMeta[filePath] = {
+        mtimeMs,
+        sessionIds: [],
+        project,
+      };
+    }
+
+    changed = true;
+  }
+
+  // Invalidate summary cache if data changed
+  if (changed) {
+    sessionCache.summary = null;
+  }
+
+  return changed;
+}
+
+/**
+ * Get all sessions, sorted by time. Uses cache for incremental updates.
+ */
+async function getCachedSessions() {
+  const fileList = await scanSessionFiles();
+  await updateCache(fileList);
+
+  const sessions = Object.values(sessionCache.sessions);
+  sessions.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
+  return sessions;
+}
+
+/**
+ * Get cached summary. Recomputes only when session data has changed.
+ */
+function getCachedSummary(sessions) {
+  if (sessionCache.summary) {
+    return sessionCache.summary;
+  }
+  sessionCache.summary = computeSummary(sessions);
+  return sessionCache.summary;
+}
+
+/**
+ * Internal: get sessions without preload synchronization.
+ * Used by preloadCache() to avoid circular await.
+ */
+async function getSessionsInternal() {
+  const sessions = await getCachedSessions();
+  const summary = getCachedSummary(sessions);
+  return { sessions, summary };
+}
+
+/**
+ * Main API handler: get sessions with caching.
+ * Waits for preload to finish (avoids redundant full parse on first request).
+ */
+async function getSessions() {
+  if (!preloadReady && preloadPromise) {
+    await preloadPromise;
+    // After preload resolves, cache is already populated — fast mtime-only scan.
+    const sessions = await getCachedSessions();
+    const summary = getCachedSummary(sessions);
+    return { sessions, summary };
+  }
+  const sessions = await getCachedSessions();
+  const summary = getCachedSummary(sessions);
+  return { sessions, summary };
+}
+
+/**
+ * Pre-load cache on server startup.
+ */
+async function preloadCache() {
+  const loaded = loadCache();
+  if (loaded) {
+    console.log(`[cache] Loaded ${Object.keys(sessionCache.fileMeta).length} file entries from disk`);
+  }
+
+  const t0 = Date.now();
+  try {
+    await getSessionsInternal();
+    const count = Object.keys(sessionCache.sessions).length;
+    const elapsed = Date.now() - t0;
+    console.log(`[cache] Pre-loaded ${count} sessions in ${elapsed}ms`);
+    persistCache();
+  } catch (err) {
+    console.error(`[cache] Preload error: ${err.message}`);
+  }
+  preloadReady = true;
+}
+
+// Start preload immediately; store promise for API requests to await
+preloadPromise = preloadCache();
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
@@ -59,6 +328,8 @@ const server = http.createServer((req, res) => {
       .then(data => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(data));
+        // Persist cache periodically (every request is fine, it's fast)
+        persistCache();
       })
       .catch(err => {
         res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -107,75 +378,6 @@ const server = http.createServer((req, res) => {
 });
 
 // Parse session files
-async function getSessions() {
-  const sessions = [];
-
-  try {
-    const projectDirs = await fs.promises.readdir(PROJECTS_DIR, { withFileTypes: true });
-
-    for (const projectEntry of projectDirs) {
-      if (!projectEntry.isDirectory()) continue;
-
-      const projectName = normalizeProjectName(projectEntry.name);
-      const projectPath = path.join(PROJECTS_DIR, projectEntry.name);
-
-      // Scan main session files
-      const files = await fs.promises.readdir(projectPath);
-      for (const file of files) {
-        if (!file.endsWith('.jsonl')) continue;
-
-        const filePath = path.join(projectPath, file);
-        const sessionData = await parseSessionFile(filePath, projectName);
-        if (sessionData) {
-          sessionData.project = normalizeProjectName(sessionData.project);
-          sessions.push(sessionData);
-        }
-      }
-
-      // Scan subagent session files
-      for (const file of files) {
-        if (!file.endsWith('.jsonl')) continue;
-
-        const sessionId = path.basename(file, '.jsonl');
-        const subagentsDir = path.join(projectPath, sessionId, 'subagents');
-
-        try {
-          const subagentFiles = await fs.promises.readdir(subagentsDir);
-          for (const subFile of subagentFiles) {
-            if (subFile.endsWith('.meta.json')) continue;
-            if (!subFile.endsWith('.jsonl')) continue;
-
-            const subPath = path.join(subagentsDir, subFile);
-            const sessionData = await parseSessionFile(subPath, `${projectName} (subagent)`);
-            if (sessionData) {
-              sessionData.project = normalizeProjectName(sessionData.project);
-              sessions.push(sessionData);
-            }
-          }
-        } catch (e) {
-          // No subagents directory
-        }
-      }
-    }
-
-    // Sort by time
-    sessions.sort((a, b) => new Date(b.start_time) - new Date(a.start_time));
-
-    // Fill in est_cost per session using model-specific pricing
-    for (const s of sessions) {
-      const pricing = getPricing(s.model_str);
-      s.est_cost = calcCost(s, pricing);
-    }
-
-    return { sessions, summary: computeSummary(sessions) };
-  } catch (err) {
-    if (err.code === 'ENOENT') {
-      return { sessions: [], summary: computeSummary([]) };
-    }
-    throw err;
-  }
-}
-
 async function parseSessionFile(filePath, projectName) {
   const sessionId = path.basename(filePath, '.jsonl');
   const usageTotal = {
